@@ -1,0 +1,6 @@
+{
+  "name": "AutoPaint CRM",
+  "description": "Сучасна адаптивна CRM-система для автомаляра та кузовного цеху: замовлення, клієнти, авто, склад матеріалів та облік фінансів.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
