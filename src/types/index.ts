@@ -65,6 +65,15 @@ export interface OrderMaterialItem {
   total: number;
 }
 
+export interface OrderPartItem {
+  id: string;
+  name: string; // Назва запчастини (напр. "Передній бампер", "Крило ліве", "Фара LED")
+  price: number; // Ціна запчастини в ₴
+  delivery: number; // Доставка запчастини в ₴
+  deliveryCost?: number; // Сумісність для назви
+  total: number; // Разом сума (ціна + доставка)
+}
+
 export interface Order {
   id: string;
   orderNumber: string; // Номер замовлення (наприклад, №2024-042)
@@ -74,7 +83,8 @@ export interface Order {
   deadlineDate?: string;
   status: OrderStatus;
   works: OrderWorkItem[];
-  materials: OrderMaterialItem[];
+  materials?: OrderMaterialItem[];
+  parts?: OrderPartItem[];
   totalAmount: number;
   paidAmount: number;
   remainingAmount: number; // Залишок (борг)
@@ -128,4 +138,5 @@ export type ActiveTab =
   | 'vehicles'
   | 'orders'
   | 'inventory'
-  | 'finances';
+  | 'finances'
+  | 'payroll';

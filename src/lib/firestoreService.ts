@@ -54,8 +54,14 @@ class FirestoreSyncService {
           onData(items);
         },
         (error) => {
-          console.warn(`Firestore subscription error for [${colName}]:`, error);
-          this.setStatus('error');
+          const msg = error?.message || String(error);
+          if (error?.code === 'unavailable' || msg.includes('unavailable') || msg.includes('offline')) {
+            // Transient offline state: Firestore SDK will automatically reconnect in the background
+            this.setStatus('offline');
+          } else {
+            console.warn(`Firestore subscription error for [${colName}]:`, error);
+            this.setStatus('error');
+          }
         }
       );
       return unsubscribe;
@@ -105,6 +111,40 @@ class FirestoreSyncService {
       return snap.empty;
     } catch {
       return false;
+    }
+  }
+
+  // Delete all documents in a collection in Firestore
+  public async clearCollection(
+    colName: 'clients' | 'vehicles' | 'orders' | 'inventory' | 'finances'
+  ): Promise<void> {
+    try {
+      const snap = await getDocs(collection(db, colName));
+      if (snap.empty) return;
+      const batch = writeBatch(db);
+      snap.forEach((d) => {
+        batch.delete(d.ref);
+      });
+      await batch.commit();
+      this.setStatus('connected');
+    } catch (e) {
+      console.error(`Failed to clear collection [${colName}]:`, e);
+    }
+  }
+
+  // Clear all collections in Firestore
+  public async clearAllCollections(): Promise<void> {
+    try {
+      await Promise.all([
+        this.clearCollection('clients'),
+        this.clearCollection('vehicles'),
+        this.clearCollection('orders'),
+        this.clearCollection('inventory'),
+        this.clearCollection('finances'),
+      ]);
+      this.setStatus('connected');
+    } catch (e) {
+      console.error('Failed to clear all collections:', e);
     }
   }
 

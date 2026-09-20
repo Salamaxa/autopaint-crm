@@ -228,6 +228,24 @@ export const CloudDatabaseModal: React.FC<CloudDatabaseModalProps> = ({
             </label>
 
             <button
+              onClick={async () => {
+                if (
+                  confirm(
+                    'Повністю очистити всю базу даних (видалити всі наряди, клієнтів, авто, матеріали та фінанси) з локального сховища та хмари Firebase Firestore?\n\nЦе дасть змогу почати роботу в системі з чистого аркуша.'
+                  )
+                ) {
+                  await storage.clearAllData();
+                  onRefreshData();
+                  alert('Базу даних успішно очищено! Система готова до роботи з нуля.');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Очистити базу (з нуля)</span>
+            </button>
+
+            <button
               onClick={() => {
                 if (
                   confirm(

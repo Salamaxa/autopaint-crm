@@ -27,26 +27,32 @@ class StorageService {
   private initStorage() {
     if (typeof window === 'undefined') return;
     try {
+      // By default start with clean production mode - one-time clean wipe for existing cache
+      if (!localStorage.getItem('autopaint_crm_clean_v2')) {
+        localStorage.setItem('autopaint_crm_clean_v2', 'true');
+        localStorage.setItem(STORAGE_KEYS.IS_PRODUCTION_MODE, 'true');
+        localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify([]));
+        localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify([]));
+        localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify([]));
+        localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify([]));
+        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+        idb.clearAll();
+      }
+
       if (!localStorage.getItem(STORAGE_KEYS.CLIENTS)) {
-        localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(initialClients));
-        idb.bulkPut('clients', initialClients);
+        localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify([]));
       }
       if (!localStorage.getItem(STORAGE_KEYS.VEHICLES)) {
-        localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify(initialVehicles));
-        idb.bulkPut('vehicles', initialVehicles);
+        localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify([]));
       }
       if (!localStorage.getItem(STORAGE_KEYS.ORDERS)) {
-        const sanitized = initialOrders.map((o) => this.sanitizeOrder(o));
-        localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(sanitized));
-        idb.bulkPut('orders', sanitized);
+        localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify([]));
       }
       if (!localStorage.getItem(STORAGE_KEYS.INVENTORY)) {
-        localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(initialInventory));
-        idb.bulkPut('inventory', initialInventory);
+        localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify([]));
       }
       if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
-        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(initialTransactions));
-        idb.bulkPut('transactions', initialTransactions);
+        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
       }
 
       this.isInitialized = true;
@@ -60,70 +66,44 @@ class StorageService {
 
     // Real-time synchronization from Firestore to local state
     firestoreSync.subscribeToCollection<Client>('clients', (remoteClients) => {
-      if (remoteClients.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(remoteClients));
-        idb.bulkPut('clients', remoteClients);
-        this.notify();
-      } else {
-        // First boot seeding if Firestore is empty
-        const current = this.getClients();
-        if (current.length > 0) {
-          current.forEach((c) => firestoreSync.saveEntity('clients', c));
-        }
-      }
+      localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(remoteClients));
+      idb.clear('clients').then(() => {
+        if (remoteClients.length > 0) idb.bulkPut('clients', remoteClients);
+      });
+      this.notify();
     });
 
     firestoreSync.subscribeToCollection<Vehicle>('vehicles', (remoteVehicles) => {
-      if (remoteVehicles.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify(remoteVehicles));
-        idb.bulkPut('vehicles', remoteVehicles);
-        this.notify();
-      } else {
-        const current = this.getVehicles();
-        if (current.length > 0) {
-          current.forEach((v) => firestoreSync.saveEntity('vehicles', v));
-        }
-      }
+      localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify(remoteVehicles));
+      idb.clear('vehicles').then(() => {
+        if (remoteVehicles.length > 0) idb.bulkPut('vehicles', remoteVehicles);
+      });
+      this.notify();
     });
 
     firestoreSync.subscribeToCollection<Order>('orders', (remoteOrders) => {
-      if (remoteOrders.length > 0) {
-        const sanitized = remoteOrders.map((o) => this.sanitizeOrder(o));
-        localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(sanitized));
-        idb.bulkPut('orders', sanitized);
-        this.notify();
-      } else {
-        const current = this.getOrders();
-        if (current.length > 0) {
-          current.forEach((o) => firestoreSync.saveEntity('orders', this.sanitizeOrder(o)));
-        }
-      }
+      const sanitized = remoteOrders.map((o) => this.sanitizeOrder(o));
+      localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(sanitized));
+      idb.clear('orders').then(() => {
+        if (sanitized.length > 0) idb.bulkPut('orders', sanitized);
+      });
+      this.notify();
     });
 
     firestoreSync.subscribeToCollection<InventoryItem>('inventory', (remoteItems) => {
-      if (remoteItems.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(remoteItems));
-        idb.bulkPut('inventory', remoteItems);
-        this.notify();
-      } else {
-        const current = this.getInventory();
-        if (current.length > 0) {
-          current.forEach((i) => firestoreSync.saveEntity('inventory', i));
-        }
-      }
+      localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(remoteItems));
+      idb.clear('inventory').then(() => {
+        if (remoteItems.length > 0) idb.bulkPut('inventory', remoteItems);
+      });
+      this.notify();
     });
 
     firestoreSync.subscribeToCollection<FinanceTransaction>('finances', (remoteTx) => {
-      if (remoteTx.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(remoteTx));
-        idb.bulkPut('transactions', remoteTx);
-        this.notify();
-      } else {
-        const current = this.getTransactions();
-        if (current.length > 0) {
-          current.forEach((t) => firestoreSync.saveEntity('finances', t));
-        }
-      }
+      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(remoteTx));
+      idb.clear('transactions').then(() => {
+        if (remoteTx.length > 0) idb.bulkPut('transactions', remoteTx);
+      });
+      this.notify();
     });
   }
 
@@ -192,7 +172,12 @@ class StorageService {
 
     const worksTotal = works.reduce((sum, w) => sum + w.price, 0);
     const materialsTotal = (order.materials || []).reduce((sum, m) => sum + (Number(m.total) || 0), 0);
-    const totalAmount = worksTotal + materialsTotal;
+    const partsTotal = (order.parts || []).reduce((sum, p) => {
+      const price = Number(p.price) || 0;
+      const deliveryCost = Number(p.deliveryCost) || 0;
+      return sum + (p.total !== undefined ? Number(p.total) : price + deliveryCost);
+    }, 0);
+    const totalAmount = worksTotal + materialsTotal + partsTotal;
     const paidAmount = Number(order.paidAmount) || 0;
     const remainingAmount = Math.max(0, totalAmount - paidAmount);
 
@@ -209,9 +194,9 @@ class StorageService {
   public getClients(): Client[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.CLIENTS);
-      return data ? JSON.parse(data) : initialClients;
+      return data ? JSON.parse(data) : [];
     } catch {
-      return initialClients;
+      return [];
     }
   }
 
@@ -241,9 +226,9 @@ class StorageService {
   public getVehicles(): Vehicle[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.VEHICLES);
-      return data ? JSON.parse(data) : initialVehicles;
+      return data ? JSON.parse(data) : [];
     } catch {
-      return initialVehicles;
+      return [];
     }
   }
 
@@ -273,10 +258,10 @@ class StorageService {
   public getOrders(): Order[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.ORDERS);
-      const orders: Order[] = data ? JSON.parse(data) : initialOrders;
+      const orders: Order[] = data ? JSON.parse(data) : [];
       return orders.map((o) => this.sanitizeOrder(o));
     } catch {
-      return initialOrders.map((o) => this.sanitizeOrder(o));
+      return [];
     }
   }
 
@@ -351,9 +336,9 @@ class StorageService {
   public getInventory(): InventoryItem[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.INVENTORY);
-      return data ? JSON.parse(data) : initialInventory;
+      return data ? JSON.parse(data) : [];
     } catch {
-      return initialInventory;
+      return [];
     }
   }
 
@@ -379,13 +364,48 @@ class StorageService {
     this.notify();
   }
 
+  public deductInventoryItem(id: string, amount: number, notes?: string): { success: boolean; newQuantity: number } {
+    const items = this.getInventory();
+    const item = items.find((i) => i.id === id);
+    if (!item) return { success: false, newQuantity: 0 };
+
+    const deductQty = Math.max(0, Number(amount) || 0);
+    item.quantity = Math.max(0, Math.round((item.quantity - deductQty) * 100) / 100);
+    item.updatedAt = new Date().toISOString();
+
+    localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(items));
+    idb.put('inventory', item);
+    firestoreSync.saveEntity('inventory', item);
+
+    // If cost was incurred, record an expense transaction if needed
+    if (deductQty > 0 && item.price > 0) {
+      const expenseAmount = Math.round(deductQty * item.price);
+      if (expenseAmount > 0) {
+        const tx: FinanceTransaction = {
+          id: 'tx-deduct-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+          type: 'expense',
+          category: 'Списання матеріалу зі складу',
+          amount: expenseAmount,
+          date: new Date().toISOString().split('T')[0],
+          description: notes || `Списано зі складу: ${item.name} (${deductQty} ${item.unit})`,
+          paymentMethod: 'cash',
+          createdAt: new Date().toISOString(),
+        };
+        this.saveTransaction(tx);
+      }
+    }
+
+    this.notify();
+    return { success: true, newQuantity: item.quantity };
+  }
+
   // --- Transactions ---
   public getTransactions(): FinanceTransaction[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-      return data ? JSON.parse(data) : initialTransactions;
+      return data ? JSON.parse(data) : [];
     } catch {
-      return initialTransactions;
+      return [];
     }
   }
 
@@ -422,15 +442,16 @@ class StorageService {
     });
   }
 
-  // --- Clean start for real business (Clear Demo Data) ---
-  public clearAllData(): void {
+  // --- Clean start for real business (Clear Demo Data & Cloud Database) ---
+  public async clearAllData(): Promise<void> {
     localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.IS_PRODUCTION_MODE, 'true');
-    idb.clearAll();
+    await idb.clearAll();
+    await firestoreSync.clearAllCollections();
     this.notify();
   }
 

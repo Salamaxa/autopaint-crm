@@ -131,6 +131,21 @@ class IndexedDBStorage {
     }
   }
 
+  public async clear(storeName: string): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn(`IndexedDB clear(${storeName}) failed:`, e);
+    }
+  }
+
   public async clearAll(): Promise<void> {
     try {
       const db = await this.getDB();

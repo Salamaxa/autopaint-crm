@@ -1,14 +1,8 @@
 import React from 'react';
 import {
-  Database,
-  RefreshCw,
   Plus,
-  SlidersHorizontal,
-  Bell,
-  Sparkles,
 } from 'lucide-react';
 import { ActiveTab } from '../types';
-import { isSupabaseConfigured } from '../lib/supabase';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -17,7 +11,7 @@ interface HeaderProps {
   onOpenNewVehicle: () => void;
   onOpenNewInventory: () => void;
   onOpenNewTransaction: () => void;
-  openSupabaseModal: () => void;
+  openSupabaseModal?: () => void;
   activeOrdersCount: number;
   lowStockCount: number;
 }
@@ -29,12 +23,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewVehicle,
   onOpenNewInventory,
   onOpenNewTransaction,
-  openSupabaseModal,
   activeOrdersCount,
   lowStockCount,
 }) => {
-  const isSupabaseLive = isSupabaseConfigured();
-
   const getTabTitle = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -49,6 +40,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Склад матеріалів';
       case 'finances':
         return 'Фінанси та борги';
+      case 'payroll':
+        return 'Заробітна плата';
       default:
         return 'AutoPaint CRM';
     }
@@ -95,24 +88,6 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
-        {/* Cloud Firestore status badge button */}
-        <button
-          onClick={openSupabaseModal}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 text-xs text-slate-300 transition-all group"
-          title="Хмарна база даних Firebase Firestore"
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-emerald-400" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-          </span>
-          <span className="font-medium text-slate-200">
-            База даних
-          </span>
-          <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-            Firestore
-          </span>
-        </button>
-
         {/* Dynamic Contextual Create Button */}
         <button
           onClick={handleQuickAdd}

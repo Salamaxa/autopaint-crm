@@ -23,9 +23,15 @@ import {
   Layers,
   ChevronDown,
   FolderPlus,
+  Package,
   Check,
   FileText,
+  Users,
+  UserPlus,
+  Car,
+  Phone,
 } from 'lucide-react';
+import { storage } from '../lib/storage';
 import {
   Order,
   Client,
@@ -34,6 +40,7 @@ import {
   OrderStatus,
   OrderWorkItem,
   OrderMaterialItem,
+  OrderPartItem,
   WORK_CATEGORIES,
   WorkCategory,
 } from '../types';
@@ -138,6 +145,8 @@ interface OrdersViewProps {
   onCloseInitialCreate?: () => void;
   preselectedClientId?: string | null;
   preselectedVehicleId?: string | null;
+  onSaveClient?: (client: Client) => void;
+  onSaveVehicle?: (vehicle: Vehicle) => void;
 }
 
 export const OrdersView: React.FC<OrdersViewProps> = ({
@@ -155,12 +164,40 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   onCloseInitialCreate,
   preselectedClientId,
   preselectedVehicleId,
+  onSaveClient,
+  onSaveVehicle,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(selectedOrder || null);
   const [isCreateOpen, setIsCreateOpen] = useState(initialCreateOpen);
+
+  // Quick Client Creation Modal State
+  const [showQuickClientModal, setShowQuickClientModal] = useState(false);
+  const [quickClientName, setQuickClientName] = useState('');
+  const [quickClientPhone, setQuickClientPhone] = useState('+380 ');
+  const [quickClientNotes, setQuickClientNotes] = useState('');
+  const [quickAlsoCreateVehicle, setQuickAlsoCreateVehicle] = useState(true);
+  const [quickVehicleMake, setQuickVehicleMake] = useState('');
+  const [quickVehicleModel, setQuickVehicleModel] = useState('');
+  const [quickVehiclePlate, setQuickVehiclePlate] = useState('');
+  const [quickVehicleVin, setQuickVehicleVin] = useState('');
+  const [quickVehicleYear, setQuickVehicleYear] = useState('');
+  const [quickVehicleColor, setQuickVehicleColor] = useState('');
+  const [quickVehicleColorCode, setQuickVehicleColorCode] = useState('');
+
+  // Quick Standalone Vehicle Creation Modal State
+  const [showQuickVehicleModal, setShowQuickVehicleModal] = useState(false);
+  const [standaloneVehicleClientId, setStandaloneVehicleClientId] = useState('');
+  const [standaloneVehicleMake, setStandaloneVehicleMake] = useState('');
+  const [standaloneVehicleModel, setStandaloneVehicleModel] = useState('');
+  const [standaloneVehiclePlate, setStandaloneVehiclePlate] = useState('');
+  const [standaloneVehicleVin, setStandaloneVehicleVin] = useState('');
+  const [standaloneVehicleYear, setStandaloneVehicleYear] = useState('');
+  const [standaloneVehicleColor, setStandaloneVehicleColor] = useState('');
+  const [standaloneVehicleColorCode, setStandaloneVehicleColorCode] = useState('');
+  const [standaloneVehicleNotes, setStandaloneVehicleNotes] = useState('');
 
   // Quick Payment Modal
   const [paymentModalOrder, setPaymentModalOrder] = useState<Order | null>(null);
@@ -183,6 +220,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const [status, setStatus] = useState<OrderStatus>('new');
   const [works, setWorks] = useState<OrderWorkItem[]>([]);
   const [materials, setMaterials] = useState<OrderMaterialItem[]>([]);
+  const [parts, setParts] = useState<OrderPartItem[]>([]);
   const [paidAmount, setPaidAmount] = useState<string>('0');
   const [notes, setNotes] = useState('');
 
@@ -215,7 +253,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     return materials.reduce((sum, m) => sum + (Number(m.total) || 0), 0);
   }, [materials]);
 
-  const totalCalculated = worksTotal + materialsTotal;
+  const partsTotal = useMemo(() => {
+    return parts.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
+  }, [parts]);
+
+  const totalCalculated = worksTotal + materialsTotal + partsTotal;
 
   // Active form salary calculation summary
   const formSalarySummary = useMemo(() => {
@@ -265,51 +307,115 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
     const initialSections = ['Підготовка та пофарбування', 'Рихтувальні роботи', 'Слюсарні роботи'];
     setFormSections(initialSections);
-    setWorks([
-      {
-        id: 'w-1-' + Date.now(),
-        category: 'Підготовка та пофарбування',
-        title: 'Пофарбування бампера',
-        price: 10000,
-        materialCost: 0,
-        helperSalary: 5000,
-        painterSalary: 5000,
-      },
-      {
-        id: 'w-2-' + (Date.now() + 1),
-        category: 'Підготовка та пофарбування',
-        title: 'Пофарбування крила',
-        price: 8000,
-        materialCost: 0,
-        helperSalary: 4000,
-        painterSalary: 4000,
-      },
-      {
-        id: 'w-3-' + (Date.now() + 2),
-        category: 'Рихтувальні роботи',
-        title: 'Ремонт крила правого',
-        price: 4000,
-        materialCost: 0,
-        helperSalary: 2000,
-        painterSalary: 2000,
-      },
-      {
-        id: 'w-4-' + (Date.now() + 3),
-        category: 'Слюсарні роботи',
-        title: 'Демонтаж-монтаж деталей',
-        price: 2500,
-        materialCost: 0,
-        helperSalary: 1250,
-        painterSalary: 1250,
-      },
-    ]);
+    setWorks([]);
     setMaterials([]);
+    setParts([]);
     setPaidAmount('0');
     setNotes('');
     setShowAddSectionBox(false);
     setNewSectionInput('');
     setEditingSectionName(null);
     setIsCreateOpen(true);
+  };
+
+  // Quick Save Client (and optionally vehicle) directly inside the Order form
+  const handleSaveQuickClient = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickClientName.trim()) return;
+
+    const newClient: Client = {
+      id: 'client-' + Date.now(),
+      name: quickClientName.trim(),
+      phone: quickClientPhone.trim() || '+380',
+      notes: quickClientNotes.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (onSaveClient) {
+      onSaveClient(newClient);
+    }
+    storage.saveClient(newClient);
+    setClientId(newClient.id);
+
+    // If vehicle details are also provided, create and link the vehicle immediately
+    if (quickAlsoCreateVehicle && quickVehicleMake.trim()) {
+      const newVehicle: Vehicle = {
+        id: 'veh-' + (Date.now() + 1),
+        clientId: newClient.id,
+        make: quickVehicleMake.trim(),
+        model: quickVehicleModel.trim(),
+        licensePlate: quickVehiclePlate.trim().toUpperCase() || 'БЕЗ НОМЕРА',
+        vin: quickVehicleVin.trim().toUpperCase() || 'VIN-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+        year: quickVehicleYear ? parseInt(quickVehicleYear, 10) : undefined,
+        colorName: quickVehicleColor.trim() || undefined,
+        colorCode: quickVehicleColorCode.trim() || undefined,
+        createdAt: new Date().toISOString(),
+      };
+
+      if (onSaveVehicle) {
+        onSaveVehicle(newVehicle);
+      }
+      storage.saveVehicle(newVehicle);
+      setVehicleId(newVehicle.id);
+    }
+
+    setShowQuickClientModal(false);
+    setQuickClientName('');
+    setQuickClientPhone('+380 ');
+    setQuickClientNotes('');
+    setQuickVehicleMake('');
+    setQuickVehicleModel('');
+    setQuickVehiclePlate('');
+    setQuickVehicleVin('');
+    setQuickVehicleYear('');
+    setQuickVehicleColor('');
+    setQuickVehicleColorCode('');
+  };
+
+  // Quick Save Standalone Vehicle directly inside the Order form
+  const handleSaveStandaloneVehicle = (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetClientId = standaloneVehicleClientId || clientId;
+    if (!targetClientId) {
+      alert('Будь ласка, спочатку оберіть або створіть клієнта');
+      return;
+    }
+    if (!standaloneVehicleMake.trim()) {
+      alert('Будь ласка, вкажіть марку автомобіля');
+      return;
+    }
+
+    const newVehicle: Vehicle = {
+      id: 'veh-' + Date.now(),
+      clientId: targetClientId,
+      make: standaloneVehicleMake.trim(),
+      model: standaloneVehicleModel.trim(),
+      licensePlate: standaloneVehiclePlate.trim().toUpperCase() || 'БЕЗ НОМЕРА',
+      vin: standaloneVehicleVin.trim().toUpperCase() || 'VIN-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      year: standaloneVehicleYear ? parseInt(standaloneVehicleYear, 10) : undefined,
+      colorName: standaloneVehicleColor.trim() || undefined,
+      colorCode: standaloneVehicleColorCode.trim() || undefined,
+      notes: standaloneVehicleNotes.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (onSaveVehicle) {
+      onSaveVehicle(newVehicle);
+    }
+    storage.saveVehicle(newVehicle);
+
+    setClientId(targetClientId);
+    setVehicleId(newVehicle.id);
+    setShowQuickVehicleModal(false);
+
+    setStandaloneVehicleMake('');
+    setStandaloneVehicleModel('');
+    setStandaloneVehiclePlate('');
+    setStandaloneVehicleVin('');
+    setStandaloneVehicleYear('');
+    setStandaloneVehicleColor('');
+    setStandaloneVehicleColorCode('');
+    setStandaloneVehicleNotes('');
   };
 
   // Open Edit
@@ -350,7 +456,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     });
 
     setWorks(sanitizedWorks);
-    setMaterials(order.materials.length > 0 ? [...order.materials] : []);
+    setMaterials(order.materials && order.materials.length > 0 ? [...order.materials] : []);
+    setParts(order.parts && order.parts.length > 0 ? [...order.parts] : []);
     setPaidAmount(String(order.paidAmount || 0));
     setNotes(order.notes || '');
     setShowAddSectionBox(false);
@@ -471,6 +578,19 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     ]);
   };
 
+  const handleAddPart = () => {
+    setParts((prev) => [
+      ...prev,
+      {
+        id: 'part-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+        name: '',
+        price: 0,
+        delivery: 0,
+        total: 0,
+      },
+    ]);
+  };
+
   const handleSaveOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!orderNumber.trim() || !clientId || !vehicleId) {
@@ -492,6 +612,18 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       };
     });
 
+    const finalizedParts = parts.map((part) => {
+      const price = Math.max(0, Number(part.price) || 0);
+      const delivery = Math.max(0, Number(part.delivery) || 0);
+      return {
+        ...part,
+        name: part.name.trim(),
+        price,
+        delivery,
+        total: price + delivery,
+      };
+    });
+
     const paid = Number(paidAmount) || 0;
     const remaining = Math.max(0, totalCalculated - paid);
 
@@ -505,6 +637,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       status,
       works: finalizedWorks,
       materials,
+      parts: finalizedParts,
       totalAmount: totalCalculated,
       paidAmount: paid,
       remainingAmount: remaining,
@@ -868,12 +1001,33 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             </div>
           </div>
 
-          {/* Client & Vehicle Pickers */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Client & Vehicle Pickers with Instant Creation */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
+            {/* Client Picker */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Клієнт *
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-amber-400" />
+                  Клієнт *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickClientName('');
+                    setQuickClientPhone('+380 ');
+                    setQuickClientNotes('');
+                    setQuickAlsoCreateVehicle(true);
+                    setQuickVehicleMake('');
+                    setQuickVehicleModel('');
+                    setQuickVehiclePlate('');
+                    setQuickVehicleVin('');
+                    setShowQuickClientModal(true);
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-500/30"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Створити клієнта
+                </button>
+              </div>
               <select
                 required
                 value={clientId}
@@ -882,10 +1036,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   const matching = vehicles.filter((v) => v.clientId === e.target.value);
                   setVehicleId(matching[0]?.id || '');
                 }}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-amber-500"
               >
                 <option value="" disabled>
-                  Оберіть клієнта
+                  {clients.length === 0 ? '— Немає клієнтів (створіть нового) —' : 'Оберіть клієнта зі списку'}
                 </option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -893,27 +1047,79 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   </option>
                 ))}
               </select>
+              {clients.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickClientName('');
+                    setQuickClientPhone('+380 ');
+                    setQuickClientNotes('');
+                    setQuickAlsoCreateVehicle(true);
+                    setShowQuickClientModal(true);
+                  }}
+                  className="mt-2 w-full py-1.5 px-3 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Створити клієнта в 1 клік
+                </button>
+              )}
             </div>
 
+            {/* Vehicle Picker */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Автомобіль клієнта *
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Car className="w-3.5 h-3.5 text-amber-400" />
+                  Автомобіль клієнта *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStandaloneVehicleClientId(clientId || (clients[0]?.id || ''));
+                    setStandaloneVehicleMake('');
+                    setStandaloneVehicleModel('');
+                    setStandaloneVehiclePlate('');
+                    setStandaloneVehicleVin('');
+                    setStandaloneVehicleYear('');
+                    setStandaloneVehicleColor('');
+                    setStandaloneVehicleColorCode('');
+                    setShowQuickVehicleModal(true);
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-500/30"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Додати авто
+                </button>
+              </div>
               <select
                 required
                 value={vehicleId}
                 onChange={(e) => setVehicleId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-amber-500"
               >
                 <option value="" disabled>
-                  {clientVehicles.length === 0 ? 'У клієнта немає авто' : 'Оберіть автомобіль'}
+                  {!clientId
+                    ? 'Спочатку оберіть або створіть клієнта'
+                    : clientVehicles.length === 0
+                    ? 'У клієнта немає авто (додайте авто)'
+                    : 'Оберіть автомобіль'}
                 </option>
                 {clientVehicles.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.make} {v.model} ({v.licensePlate || 'без номера'})
+                    {v.make} {v.model} ({v.licensePlate || 'без номера'}) {v.colorCode ? `[${v.colorCode}]` : ''}
                   </option>
                 ))}
               </select>
+              {clientId && clientVehicles.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStandaloneVehicleClientId(clientId);
+                    setShowQuickVehicleModal(true);
+                  }}
+                  className="mt-2 w-full py-1.5 px-3 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Додати автомобіль для цього клієнта
+                </button>
+              )}
             </div>
           </div>
 
@@ -1149,26 +1355,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Quick Presets for this Section (if available) */}
-                      {templates.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                          <span className="text-slate-500 text-[10px] uppercase font-bold">Зразки робіт:</span>
-                          {templates.map((tpl) => (
-                            <button
-                              key={tpl.title}
-                              type="button"
-                              onClick={() => handleAddWorkToSection(sectionName, { title: tpl.title, price: tpl.price })}
-                              className="px-2 py-0.5 rounded bg-slate-950/80 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors flex items-center gap-1"
-                              title={`Додати ${tpl.title} за ${formatCurrency(tpl.price)}`}
-                            >
-                              <Plus className="w-2.5 h-2.5 text-amber-400" />
-                              <span>{tpl.title}</span>
-                              <span className="text-amber-400 font-mono">({formatCurrency(tpl.price)})</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
                       {/* Works inside this Section */}
                       {sectionWorks.length === 0 ? (
                         <div className="p-3 rounded-lg border border-dashed border-slate-800 bg-slate-950/30 text-center">
@@ -1197,14 +1383,14 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                                 </div>
 
                                 {/* Work title */}
-                                <div className="sm:col-span-7">
+                                <div className="sm:col-span-5">
                                   <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
                                     Найменування роботи *
                                   </label>
                                   <input
                                     type="text"
                                     required
-                                    placeholder="Вкажіть назву роботи (напр. Пофарбування бампера, Ремонт крила...)"
+                                    placeholder="Вкажіть назву роботи (напр. Бампер передній...)"
                                     value={work.title}
                                     onChange={(e) => updateWork(work.id, { title: e.target.value })}
                                     className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 font-medium"
@@ -1212,7 +1398,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                                 </div>
 
                                 {/* Work price */}
-                                <div className="sm:col-span-3">
+                                <div className="sm:col-span-2">
                                   <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
                                     Вартість (₴) *
                                   </label>
@@ -1228,9 +1414,45 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                                           price: Math.max(0, Number(e.target.value) || 0),
                                         })
                                       }
-                                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono font-bold text-right focus:outline-none focus:border-amber-500 pr-6"
+                                      className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono font-bold text-right focus:outline-none focus:border-amber-500 pr-5"
                                     />
-                                    <span className="absolute right-2 top-1.5 text-xs text-slate-500">₴</span>
+                                    <span className="absolute right-1.5 top-1.5 text-xs text-slate-500">₴</span>
+                                  </div>
+                                </div>
+
+                                {/* Material Cost */}
+                                <div className="sm:col-span-2">
+                                  <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                                    Матеріали (₴)
+                                  </label>
+                                  <div className="relative">
+                                    <input
+                                      type="number"
+                                      placeholder="0"
+                                      min="0"
+                                      value={work.materialCost || ''}
+                                      onChange={(e) =>
+                                        updateWork(work.id, {
+                                          materialCost: Math.max(0, Number(e.target.value) || 0),
+                                        })
+                                      }
+                                      className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-rose-300 font-mono text-right focus:outline-none focus:border-amber-500 pr-5"
+                                      title="Вартість списаних матеріалів на цю роботу"
+                                    />
+                                    <span className="absolute right-1.5 top-1.5 text-xs text-slate-500">₴</span>
+                                  </div>
+                                </div>
+
+                                {/* Helper Salary indicator: (Price - Materials) / 2 */}
+                                <div className="sm:col-span-2">
+                                  <label className="block text-[10px] uppercase font-bold text-amber-300 mb-1">
+                                    ЗП підготовщика
+                                  </label>
+                                  <div
+                                    className="px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-xs font-mono font-bold text-amber-400 text-right"
+                                    title={`Розрахунок: (${formatCurrency(work.price || 0)} - ${formatCurrency(work.materialCost || 0)}) / 2`}
+                                  >
+                                    {formatCurrency(work.helperSalary || 0)}
                                   </div>
                                 </div>
 
@@ -1281,145 +1503,122 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             </div>
           </div>
 
-          {/* SECTION: Materials */}
+          {/* SECTION: Parts (Запчастини) */}
           <div className="space-y-3 pt-2 border-t border-slate-800">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
-                <Boxes className="w-4 h-4 text-amber-400" />
-                Додаткові матеріали наряду ({materials.length}) — Разом: {formatCurrency(materialsTotal)}
+                <Package className="w-4 h-4 text-amber-400" />
+                Запчастини ({parts.length}) — Разом: {formatCurrency(partsTotal)}
               </h4>
-              <div className="flex items-center gap-2">
-                <select
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleAddMaterial(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-300 focus:outline-none"
-                  defaultValue=""
-                >
-                  <option value="" disabled>
-                    + Додати зі складу...
-                  </option>
-                  {inventory.map((inv) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.name} ({inv.quantity} {inv.unit} залиш.)
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => handleAddMaterial()}
-                  className="text-xs text-amber-400 hover:underline font-bold"
-                >
-                  + Вручну
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleAddPart}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-semibold transition-colors self-start sm:self-auto"
+              >
+                <Plus className="w-3.5 h-3.5" /> + Додати запчастину
+              </button>
             </div>
 
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {materials.map((mat, index) => (
-                <div key={mat.id} className="grid grid-cols-12 gap-2 items-center text-xs">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Матеріал (напр. Лак HS, Грунт 4:1)"
-                    value={mat.name}
-                    onChange={(e) => {
-                      const updated = [...materials];
-                      updated[index].name = e.target.value;
-                      setMaterials(updated);
-                    }}
-                    className="col-span-5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                  />
-                  <div className="col-span-2 flex items-center gap-1">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      placeholder="К-сть"
-                      value={mat.quantity || ''}
-                      onChange={(e) => {
-                        const updated = [...materials];
-                        const q = Number(e.target.value) || 0;
-                        updated[index].quantity = q;
-                        updated[index].total = q * (updated[index].price || 0);
-                        setMaterials(updated);
-                      }}
-                      className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-center focus:outline-none"
-                    />
-                    <span className="text-[10px] text-slate-400">{mat.unit}</span>
-                  </div>
-                  <div className="col-span-2 relative">
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Ціна"
-                      value={mat.price || ''}
-                      onChange={(e) => {
-                        const updated = [...materials];
-                        const p = Number(e.target.value) || 0;
-                        updated[index].price = p;
-                        updated[index].total = (updated[index].quantity || 0) * p;
-                        setMaterials(updated);
-                      }}
-                      className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-right focus:outline-none"
-                    />
-                  </div>
-                  <div className="col-span-2 font-mono font-bold text-slate-200 text-right">
-                    {formatCurrency(mat.total)}
-                  </div>
+            {parts.length === 0 ? (
+              <div className="p-3.5 rounded-xl border border-dashed border-slate-800 bg-slate-950/40 text-center">
+                <p className="text-xs text-slate-400">
+                  Запчастини ще не додано.{' '}
                   <button
                     type="button"
-                    onClick={() => {
-                      setMaterials(materials.filter((_, i) => i !== index));
-                    }}
-                    className="col-span-1 p-1 text-slate-500 hover:text-rose-400 text-center"
+                    onClick={handleAddPart}
+                    className="text-amber-400 hover:underline font-semibold"
                   >
-                    <Trash className="w-4 h-4 mx-auto" />
+                    Додати першу запчастину
                   </button>
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                <div className="grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-slate-400 px-1">
+                  <div className="col-span-5">Назва запчастини</div>
+                  <div className="col-span-2 text-right">Ціна (₴)</div>
+                  <div className="col-span-2 text-right">Доставка (₴)</div>
+                  <div className="col-span-2 text-right">Сума (₴)</div>
+                  <div className="col-span-1 text-center"></div>
                 </div>
-              ))}
-            </div>
+
+                {parts.map((part, index) => (
+                  <div key={part.id} className="grid grid-cols-12 gap-2 items-center text-xs">
+                    <input
+                      type="text"
+                      required
+                      placeholder="напр. Бампер передній, Фара ліва"
+                      value={part.name}
+                      onChange={(e) => {
+                        const updated = [...parts];
+                        updated[index].name = e.target.value;
+                        setParts(updated);
+                      }}
+                      className="col-span-5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                    <div className="col-span-2 relative">
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Ціна"
+                        value={part.price || ''}
+                        onChange={(e) => {
+                          const updated = [...parts];
+                          const p = Number(e.target.value) || 0;
+                          updated[index].price = p;
+                          updated[index].total = p + (Number(updated[index].delivery) || 0);
+                          setParts(updated);
+                        }}
+                        className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-right focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2 relative">
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Доставка"
+                        value={part.delivery || ''}
+                        onChange={(e) => {
+                          const updated = [...parts];
+                          const d = Number(e.target.value) || 0;
+                          updated[index].delivery = d;
+                          updated[index].total = (Number(updated[index].price) || 0) + d;
+                          setParts(updated);
+                        }}
+                        className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-right focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2 font-mono font-bold text-amber-400 text-right">
+                      {formatCurrency(part.total)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setParts(parts.filter((_, i) => i !== index));
+                      }}
+                      className="col-span-1 p-1 text-slate-500 hover:text-rose-400 text-center transition-colors"
+                      title="Видалити запчастину"
+                    >
+                      <Trash className="w-4 h-4 mx-auto" />
+                    </button>
+                  </div>
+                ))}
+
+                <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-slate-950/80 border border-slate-800 text-xs">
+                  <span className="text-slate-400 font-semibold">Загальна сума запчастин:</span>
+                  <span className="font-mono font-black text-amber-400 text-sm">
+                    {formatCurrency(partsTotal)}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Payment & Comprehensive Totals Section */}
+          {/* Payment & Totals Section */}
           <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <Coins className="w-4 h-4 text-amber-400" />
-              Загальна статистика по наряду
-            </h4>
-
-            {/* Mini KPIs */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-              <div className="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Сума робіт:</span>
-                <span className="font-mono font-bold text-xs text-white">{formatCurrency(worksTotal)}</span>
-              </div>
-              <div className="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Всі матеріали:</span>
-                <span className="font-mono font-bold text-xs text-blue-400">
-                  {formatCurrency(formSalarySummary.totalAllMaterials)}
-                </span>
-              </div>
-              <div className="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Фонд зарплат (ФОП):</span>
-                <span className="font-mono font-bold text-xs text-amber-400">
-                  {formatCurrency(formSalarySummary.totalPayroll)}
-                </span>
-              </div>
-              <div className="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Залишок майстерні:</span>
-                <span className="font-mono font-bold text-xs text-emerald-400">
-                  {formatCurrency(formSalarySummary.workshopProfit)}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-800/80">
+            <div className="flex items-center justify-between text-sm">
               <span className="text-slate-300 font-semibold">Загальна сума до оплати клієнтом:</span>
-              <span className="text-lg font-black text-white font-mono">{formatCurrency(totalCalculated)}</span>
+              <span className="text-xl font-black text-white font-mono">{formatCurrency(totalCalculated)}</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center pt-2 border-t border-slate-800/80">
@@ -1700,6 +1899,68 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                         </table>
                       </div>
                     </div>
+
+                    {/* Order Parts Breakdown (if any parts exist) */}
+                    {viewingOrder.parts && viewingOrder.parts.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                            <Package className="w-4 h-4 text-amber-400" />
+                            Запчастини ({viewingOrder.parts.length})
+                          </h4>
+                          <span className="text-xs font-mono font-bold text-amber-400">
+                            Разом: {formatCurrency(viewingOrder.parts.reduce((sum, p) => sum + (Number(p.total) || 0), 0))}
+                          </span>
+                        </div>
+                        <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-slate-900 text-slate-400 border-b border-slate-800 font-semibold">
+                              <tr>
+                                <th className="p-2.5 w-10 text-center">№</th>
+                                <th className="p-2.5">Назва запчастини</th>
+                                <th className="p-2.5 text-right">Ціна</th>
+                                <th className="p-2.5 text-right">Доставка</th>
+                                <th className="p-2.5 text-right">Сума</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {viewingOrder.parts.map((p, pIdx) => (
+                                <tr
+                                  key={p.id}
+                                  className={`transition-colors ${
+                                    pIdx % 2 === 1 ? 'bg-slate-900/30' : 'bg-transparent'
+                                  } hover:bg-slate-800/30`}
+                                >
+                                  <td className="p-2.5 text-center text-slate-500 font-mono text-[11px]">
+                                    {pIdx + 1}
+                                  </td>
+                                  <td className="p-2.5 text-slate-200 font-medium">{p.name}</td>
+                                  <td className="p-2.5 text-right text-slate-400 font-mono">
+                                    {formatCurrency(p.price)}
+                                  </td>
+                                  <td className="p-2.5 text-right text-slate-400 font-mono">
+                                    {formatCurrency(p.delivery)}
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono text-amber-400 font-semibold">
+                                    {formatCurrency(p.total)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-slate-900/90 font-bold border-t border-slate-800 text-xs">
+                              <tr>
+                                <td colSpan={4} className="p-2.5 text-slate-300">
+                                  Разом запчастин:
+                                </td>
+                                <td className="p-2.5 text-right font-mono text-amber-400 font-bold text-sm">
+                                  {formatCurrency(viewingOrder.parts.reduce((sum, p) => sum + (Number(p.total) || 0), 0))}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Order Payment Summary Box */}
                     <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
@@ -2112,6 +2373,348 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                 className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20"
               >
                 Підтвердити оплату
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal: Quick Create Client (with optional instant vehicle) */}
+      {showQuickClientModal && (
+        <Modal
+          isOpen={showQuickClientModal}
+          onClose={() => setShowQuickClientModal(false)}
+          title="Створення нового клієнта"
+          subtitle="Клієнт та його автомобіль автоматично збережуться в базі та виберуться в наряді"
+          maxWidth="lg"
+        >
+          <form onSubmit={handleSaveQuickClient} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  ПІБ / Назва клієнта *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="напр. Коваленко Олександр Іванович"
+                  value={quickClientName}
+                  onChange={(e) => setQuickClientName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Номер телефону *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="+380 67 123 45 67"
+                  value={quickClientPhone}
+                  onChange={(e) => setQuickClientPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Нотатки про клієнта
+                </label>
+                <input
+                  type="text"
+                  placeholder="напр. Постійний клієнт, рекомендація"
+                  value={quickClientNotes}
+                  onChange={(e) => setQuickClientNotes(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            {/* Optional Immediate Vehicle Section */}
+            <div className="pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-between mb-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={quickAlsoCreateVehicle}
+                    onChange={(e) => setQuickAlsoCreateVehicle(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 bg-slate-900 border-slate-700 focus:ring-amber-500 focus:ring-offset-slate-950"
+                  />
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Car className="w-4 h-4 text-amber-400" />
+                    Одразу створити автомобіль для цього клієнта
+                  </span>
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  {quickAlsoCreateVehicle ? 'Авто закріпиться за нарядом' : 'Тільки клієнт'}
+                </span>
+              </div>
+
+              {quickAlsoCreateVehicle && (
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800/80 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                        Марка авто *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="напр. BMW, Toyota..."
+                        value={quickVehicleMake}
+                        onChange={(e) => setQuickVehicleMake(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                        Модель авто
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="напр. X5, Camry, Golf..."
+                        value={quickVehicleModel}
+                        onChange={(e) => setQuickVehicleModel(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                        Держномер *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="напр. KA 1234 BT"
+                        value={quickVehiclePlate}
+                        onChange={(e) => setQuickVehiclePlate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500 uppercase font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                        VIN-код (номер кузова)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="WBA... (необов'язково)"
+                        value={quickVehicleVin}
+                        onChange={(e) => setQuickVehicleVin(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                        Колір
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Чорний, Сірий..."
+                        value={quickVehicleColor}
+                        onChange={(e) => setQuickVehicleColor(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                        Код фарби
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="LC9X, 1F7..."
+                        value={quickVehicleColorCode}
+                        onChange={(e) => setQuickVehicleColorCode(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-amber-400 font-mono font-bold focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowQuickClientModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Скасувати
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20 transition-all active:scale-95 flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                Зберегти та обрати в наряд
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal: Quick Create Standalone Vehicle */}
+      {showQuickVehicleModal && (
+        <Modal
+          isOpen={showQuickVehicleModal}
+          onClose={() => setShowQuickVehicleModal(false)}
+          title="Додавання автомобіля"
+          subtitle="Автомобіль збережеться у базі та закріпиться за цим нарядом"
+          maxWidth="md"
+        >
+          <form onSubmit={handleSaveStandaloneVehicle} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Власник автомобіля (клієнт) *
+              </label>
+              <select
+                required
+                value={standaloneVehicleClientId || clientId}
+                onChange={(e) => setStandaloneVehicleClientId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
+              >
+                <option value="" disabled>
+                  Оберіть клієнта
+                </option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.phone})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Марка авто *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="напр. Audi, BMW, Skoda"
+                  value={standaloneVehicleMake}
+                  onChange={(e) => setStandaloneVehicleMake(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Модель авто
+                </label>
+                <input
+                  type="text"
+                  placeholder="напр. A6, Octavia A7"
+                  value={standaloneVehicleModel}
+                  onChange={(e) => setStandaloneVehicleModel(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Держномер *
+                </label>
+                <input
+                  type="text"
+                  placeholder="напр. AA 9900 BB"
+                  value={standaloneVehiclePlate}
+                  onChange={(e) => setStandaloneVehiclePlate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500 uppercase font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Рік випуску
+                </label>
+                <input
+                  type="number"
+                  placeholder="напр. 2018"
+                  min="1950"
+                  max={new Date().getFullYear() + 1}
+                  value={standaloneVehicleYear}
+                  onChange={(e) => setStandaloneVehicleYear(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Колір
+                </label>
+                <input
+                  type="text"
+                  placeholder="напр. Сірий металік"
+                  value={standaloneVehicleColor}
+                  onChange={(e) => setStandaloneVehicleColor(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Код фарби (для підбору)
+                </label>
+                <input
+                  type="text"
+                  placeholder="напр. LY9B, 475"
+                  value={standaloneVehicleColorCode}
+                  onChange={(e) => setStandaloneVehicleColorCode(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-amber-400 font-mono font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                VIN-код (номер кузова)
+              </label>
+              <input
+                type="text"
+                placeholder="17 символів кузова (необов'язково)"
+                value={standaloneVehicleVin}
+                onChange={(e) => setStandaloneVehicleVin(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Нотатки
+              </label>
+              <input
+                type="text"
+                placeholder="Особливості комплектації чи стану"
+                value={standaloneVehicleNotes}
+                onChange={(e) => setStandaloneVehicleNotes(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowQuickVehicleModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Скасувати
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20 transition-all active:scale-95 flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                Зберегти автомобіль
               </button>
             </div>
           </form>

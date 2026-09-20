@@ -539,7 +539,11 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
                         </div>
                         <div className="text-right">
                           <div className="font-bold text-white">{formatCurrency(o.totalAmount)}</div>
-                          <div className="text-[11px] text-slate-400">{o.works.length} робіт, {o.materials.length} матеріалів</div>
+                          <div className="text-[11px] text-slate-400">
+                            {o.works.length} робіт
+                            {o.parts && o.parts.length > 0 ? `, ${o.parts.length} запчастин` : ''}
+                            {o.materials && o.materials.length > 0 ? `, ${o.materials.length} матеріалів` : ''}
+                          </div>
                         </div>
                       </div>
                     ))}
