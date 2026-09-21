@@ -6,6 +6,8 @@ import {
   onSnapshot,
   getDocs,
   writeBatch,
+  runTransaction,
+  DocumentSnapshot,
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import {
@@ -223,6 +225,125 @@ class FirestoreSyncService {
       this.setStatus('connected');
     } catch (e) {
       console.error('Failed to clear all collections:', e);
+    }
+  }
+
+  public async postInventoryDocument(
+    document: InventoryDocument,
+    userId?: string,
+  ): Promise<InventoryDocument> {
+    const documentRef = doc(db, 'inventoryDocuments', document.id);
+    const postedAt = new Date().toISOString();
+
+    try {
+      return await runTransaction(db, async (transaction) => {
+        const existingSnapshot = await transaction.get(documentRef);
+        if (existingSnapshot.exists()) {
+          const existing = { ...(existingSnapshot.data() as InventoryDocument), id: existingSnapshot.id };
+          if (existing.status === 'posted') return existing;
+        }
+
+        const itemRefs = new Map(
+          document.lines.map((line) => [line.inventoryItemId, doc(db, 'inventory', line.inventoryItemId)]),
+        );
+        const itemSnapshots = new Map<string, DocumentSnapshot>();
+
+        for (const [itemId, itemRef] of itemRefs) {
+          itemSnapshots.set(itemId, await transaction.get(itemRef));
+        }
+
+        const isReceipt = document.type === 'receipt' || document.type === 'return_to_stock';
+        const isWriteoff = document.type === 'writeoff' || document.type === 'return_to_supplier';
+        if (!isReceipt && !isWriteoff) {
+          throw new Error(`Document type ${document.type} is not supported by posting yet`);
+        }
+
+        const now = new Date().toISOString();
+        const movements: InventoryMovement[] = [];
+        const quantityDeltas = new Map<string, number>();
+
+        for (const line of document.lines) {
+          const itemSnapshot = itemSnapshots.get(line.inventoryItemId);
+          if (!itemSnapshot?.exists()) {
+            throw new Error(`Inventory item ${line.inventoryItemId} was not found`);
+          }
+
+          const item = { ...(itemSnapshot.data() as InventoryItem), id: itemSnapshot.id };
+          const quantity = Math.max(0, Number(line.quantity) || 0);
+          const delta = isReceipt ? quantity : -quantity;
+          const nextQuantity = item.quantity + (quantityDeltas.get(item.id) || 0) + delta;
+
+          if (isWriteoff && nextQuantity < 0) {
+            throw new Error(`Insufficient stock for ${item.name}`);
+          }
+          quantityDeltas.set(item.id, (quantityDeltas.get(item.id) || 0) + delta);
+
+          const movement: InventoryMovement = {
+            id: `${document.id}-${line.id}`,
+            documentId: document.id,
+            documentNumber: document.number,
+            type: isReceipt ? 'receipt' : 'writeoff',
+            inventoryItemId: item.id,
+            batchId: line.batchId,
+            warehouseId: document.warehouseId,
+            quantityDelta: isReceipt ? quantity : -quantity,
+            unitCost: Math.max(0, Number(line.unitCost) || item.price || 0),
+            total: Math.max(0, Number(line.total) || quantity * (item.price || 0)),
+            orderId: line.orderId || document.orderId,
+            reason: line.reason,
+            createdAt: now,
+            createdBy: userId,
+          };
+          movements.push(movement);
+        }
+
+        quantityDeltas.forEach((delta, itemId) => {
+          const itemSnapshot = itemSnapshots.get(itemId);
+          if (!itemSnapshot?.exists()) return;
+          const item = { ...(itemSnapshot.data() as InventoryItem), id: itemSnapshot.id };
+          transaction.set(itemSnapshot.ref, {
+            ...item,
+            quantity: Math.round((item.quantity + delta) * 100) / 100,
+            updatedAt: now,
+          });
+        });
+
+        const postedDocument: InventoryDocument = {
+          ...document,
+          status: 'posted',
+          postedAt,
+          postedBy: userId,
+          updatedAt: now,
+          updatedBy: userId,
+        };
+        transaction.set(documentRef, JSON.parse(JSON.stringify(postedDocument)));
+
+        movements.forEach((movement) => {
+          transaction.set(doc(db, 'inventoryMovements', movement.id), JSON.parse(JSON.stringify(movement)));
+        });
+
+        if (isReceipt) {
+          document.lines.forEach((line) => {
+            const batch: InventoryBatch = {
+              id: `${document.id}-${line.id}`,
+              inventoryItemId: line.inventoryItemId,
+              warehouseId: document.warehouseId,
+              batchNumber: line.batchId,
+              receivedDocumentId: document.id,
+              receivedAt: document.date,
+              unitCost: Math.max(0, Number(line.unitCost) || 0),
+              initialQuantity: Math.max(0, Number(line.quantity) || 0),
+              remainingQuantity: Math.max(0, Number(line.quantity) || 0),
+              createdAt: now,
+            };
+            transaction.set(doc(db, 'inventoryBatches', batch.id), JSON.parse(JSON.stringify(batch)));
+          });
+        }
+
+        return postedDocument;
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `inventoryDocuments/${document.id}`);
     }
   }
 
