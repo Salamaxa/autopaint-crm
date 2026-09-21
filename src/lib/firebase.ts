@@ -1,36 +1,42 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-export const db = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+let firestoreInstance;
+try {
+  firestoreInstance = firebaseConfig.firestoreDatabaseId
+    ? initializeFirestore(app, { experimentalForceLongPolling: true }, firebaseConfig.firestoreDatabaseId)
+    : initializeFirestore(app, { experimentalForceLongPolling: true });
+} catch {
+  firestoreInstance = firebaseConfig.firestoreDatabaseId
+    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+    : getFirestore(app);
+}
+
+export const db = firestoreInstance;
+export const auth = getAuth(app);
 
 export async function testFirebaseConnection(): Promise<boolean> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
     console.log('Firebase Firestore connection verified successfully.');
     return true;
-  } catch (error: any) {
-    // Firestore SDK emits an 'unavailable' or 'client is offline' notification when first handshaking
-    // or when working offline. This is standard Firestore behavior and will automatically reconnect.
-    const msg = error?.message || String(error);
-    if (msg.includes('unavailable') || msg.includes('offline') || error?.code === 'unavailable') {
-      console.info('Firestore initial connection handshake in progress; operating with offline cache ready.');
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.error('Please check your Firebase configuration.');
     } else {
-      console.info('Firebase connection check response:', error);
+      console.info('Firestore offline/long-polling state active.');
     }
     return false;
   }
 }
 
-// Initial non-blocking check
+// Initial connection test
 if (typeof window !== 'undefined') {
-  setTimeout(() => {
-    testFirebaseConnection().catch(() => {});
-  }, 1000);
+  testFirebaseConnection().catch(() => {});
 }
 
 export { app };

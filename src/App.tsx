@@ -10,7 +10,6 @@ import { VehiclesView } from './components/VehiclesView';
 import { OrdersView } from './components/OrdersView';
 import { InventoryView } from './components/InventoryView';
 import { FinancesView } from './components/FinancesView';
-import { PayrollView } from './components/PayrollView';
 import { CloudDatabaseModal } from './components/CloudDatabaseModal';
 
 export default function App() {
@@ -232,19 +231,6 @@ export default function App() {
               onSelectOrder={handleSelectOrder}
               initialCreateOpen={financeCreateTrigger}
               onCloseInitialCreate={() => setFinanceCreateTrigger(false)}
-            />
-          )}
-
-          {activeTab === 'payroll' && (
-            <PayrollView
-              orders={orders}
-              clients={clients}
-              vehicles={vehicles}
-              inventory={inventory}
-              onDeductInventory={(itemId, amount, notes) => {
-                storage.deductInventoryItem(itemId, amount, notes);
-              }}
-              onSelectOrder={handleSelectOrder}
             />
           )}
         </main>

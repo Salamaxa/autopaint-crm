@@ -40,8 +40,6 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Склад матеріалів';
       case 'finances':
         return 'Фінанси та борги';
-      case 'payroll':
-        return 'Заробітна плата';
       default:
         return 'AutoPaint CRM';
     }

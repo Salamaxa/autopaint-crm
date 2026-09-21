@@ -4,7 +4,6 @@ export interface WorkSalaryCalculation {
   price: number;
   materialCost: number;
   helperSalary: number;
-  painterSalary: number;
   netWorkAmount: number; // price - materialCost
   isMaterialExceeded: boolean; // true if materialCost > price
   difference: number; // how much material exceeds or profit
@@ -12,7 +11,7 @@ export interface WorkSalaryCalculation {
 
 /**
  * Розрахунок зарплати для окремої роботи в наряді:
- * Формула: (ціна роботи - вартість матеріалів) / 2
+ * Формула для підготовщика: (ціна роботи - вартість матеріалів) / 2
  * Якщо матеріали коштують більше ніж ціна роботи:
  * - зарплата не може бути від'ємною (0 ₴)
  * - формується прапорець попередження (isMaterialExceeded)
@@ -27,20 +26,18 @@ export function calculateWorkItemSalary(price: number, materialCost: number): Wo
       price: p,
       materialCost: m,
       helperSalary: 0,
-      painterSalary: 0,
       netWorkAmount: net,
       isMaterialExceeded: true,
       difference: m - p,
     };
   }
 
-  const half = Math.round((net / 2) * 100) / 100;
+  const helperSalary = Math.round((net / 2) * 100) / 100;
 
   return {
     price: p,
     materialCost: m,
-    helperSalary: half,
-    painterSalary: half,
+    helperSalary,
     netWorkAmount: net,
     isMaterialExceeded: false,
     difference: net,
@@ -48,21 +45,19 @@ export function calculateWorkItemSalary(price: number, materialCost: number): Wo
 }
 
 export interface OrderSalarySummary {
-  totalWorksPrice: number;       // Загальна сума робіт
-  totalWorkMaterials: number;     // Матеріали, списані на роботи
-  totalHelperSalary: number;      // Зарплата підготовщика
-  totalPainterSalary: number;     // Частка маляра
-  totalPayroll: number;           // Загальний фонд зарплати (підготовщик + маляр)
-  totalOrderMaterials: number;    // Додаткові матеріали наряду (зі складу)
-  totalAllMaterials: number;      // Всі матеріали разом
-  hasMaterialExceeded: boolean;   // Чи є хоча б одна робота з перевищенням матеріалів
-  exceededCount: number;          // Кількість робіт з попередженням
-  workshopProfit: number;         // Чистий залишок майстерні з робіт після ЗП та матеріалів робіт
-  marginPercent: number;          // Маржинальність (%)
+  totalWorksPrice: number;        // Загальна сума робіт
+  totalWorkMaterials: number;     // Матеріали, прив'язані до окремих робіт
+  totalOrderMaterials: number;    // Витрачені матеріали та деталі наряду (зі складу / кошторис)
+  totalAllMaterials: number;      // Всі витрачені матеріали (роботи + наряд)
+  salaryBase: number;             // Чиста база для розрахунку ЗП (Сума робіт - Матеріали)
+  totalHelperSalary: number;      // Зарплата підготовщика: 50% від чистої бази робіт
+  hasMaterialExceeded: boolean;   // Чи є перевищення матеріалів над сумою робіт
+  exceededCount: number;          // Кількість робіт/нарядів з перевищенням
 }
 
 /**
- * Повний зведений розрахунок зарплат та фінансів по наряду-замовленню
+ * Зведений розрахунок зарплати підготовщика та матеріалів по наряду-замовленню
+ * Формула: (Сума робіт - Всі витрачені матеріали) / 2
  */
 export function calculateOrderSalarySummary(
   works: OrderWorkItem[] = [],
@@ -70,8 +65,6 @@ export function calculateOrderSalarySummary(
 ): OrderSalarySummary {
   let totalWorksPrice = 0;
   let totalWorkMaterials = 0;
-  let totalHelperSalary = 0;
-  let totalPainterSalary = 0;
   let exceededCount = 0;
 
   works.forEach((w) => {
@@ -80,11 +73,7 @@ export function calculateOrderSalarySummary(
     totalWorksPrice += p;
     totalWorkMaterials += m;
 
-    const calc = calculateWorkItemSalary(p, m);
-    totalHelperSalary += calc.helperSalary;
-    totalPainterSalary += calc.painterSalary;
-
-    if (calc.isMaterialExceeded) {
+    if (m > p) {
       exceededCount++;
     }
   });
@@ -94,49 +83,64 @@ export function calculateOrderSalarySummary(
     0
   );
 
-  const totalPayroll = totalHelperSalary + totalPainterSalary;
+  // Всі витрачені матеріали: матеріали окремих робіт + витрачені матеріали наряду (зі складу/кошторису)
   const totalAllMaterials = totalWorkMaterials + totalOrderMaterials;
 
-  // Чистий дохід автомайстерні від вартості робіт після виплати матеріалів та зарплати
-  const workshopProfit = Math.max(0, totalWorksPrice - totalWorkMaterials - totalPayroll);
-  const marginPercent = totalWorksPrice > 0 ? Math.round((workshopProfit / totalWorksPrice) * 100) : 0;
+  // База для ЗП: (Сума робіт - Всі витрачені матеріали)
+  const salaryBase = Math.max(0, totalWorksPrice - totalAllMaterials);
+
+  // Зарплата підготовщика (50% від бази після вирахування матеріалів)
+  const totalHelperSalary = Math.round((salaryBase / 2) * 100) / 100;
+
+  if (totalAllMaterials > totalWorksPrice && totalWorksPrice > 0) {
+    exceededCount = Math.max(1, exceededCount);
+  }
 
   return {
     totalWorksPrice,
     totalWorkMaterials,
-    totalHelperSalary,
-    totalPainterSalary,
-    totalPayroll,
     totalOrderMaterials,
     totalAllMaterials,
+    salaryBase,
+    totalHelperSalary,
     hasMaterialExceeded: exceededCount > 0,
     exceededCount,
-    workshopProfit,
-    marginPercent,
   };
 }
 
 export interface WorkCategoryGroup {
   category: string;
-  works: OrderWorkItem[];
+  works: (OrderWorkItem & {
+    orderMaterialShare?: number;
+    totalEffectiveMaterial?: number;
+    effectiveNet?: number;
+    effectiveHelperSalary?: number;
+  })[];
   totalPrice: number;
   totalMaterialCost: number;
   totalHelperSalary: number;
-  totalPainterSalary: number;
   totalNet: number;
 }
 
 /**
- * Групування переліку робіт за секціями:
+ * Групування переліку робіт за секціями з урахуванням витрачених матеріалів наряду:
  * - Підготовка та пофарбування
  * - Рихтувальні роботи
  * - Слюсарні роботи
  * - Детейлінг та полірування
  * - Інші роботи
  */
-export function groupWorksByCategory(works: OrderWorkItem[] = []): WorkCategoryGroup[] {
+export function groupWorksByCategory(
+  works: OrderWorkItem[] = [],
+  orderMaterialsTotal: number = 0
+): WorkCategoryGroup[] {
   const groups: Record<string, OrderWorkItem[]> = {};
   const orderedCatNames: string[] = [];
+
+  let overallWorksPrice = 0;
+  works.forEach((w) => {
+    overallWorksPrice += Math.max(0, Number(w.price) || 0);
+  });
 
   works.forEach((w) => {
     let cat = (w.category && w.category.trim()) || '';
@@ -180,25 +184,41 @@ export function groupWorksByCategory(works: OrderWorkItem[] = []): WorkCategoryG
     let totalPrice = 0;
     let totalMaterialCost = 0;
     let totalHelperSalary = 0;
-    let totalPainterSalary = 0;
 
-    list.forEach((w) => {
+    const enrichedWorks = list.map((w) => {
       const p = Math.max(0, Number(w.price) || 0);
       const m = Math.max(0, Number(w.materialCost) || 0);
-      const calc = calculateWorkItemSalary(p, m);
+
+      // Пропорційний розподіл матеріалів наряду (якщо вони є)
+      const orderMaterialShare =
+        orderMaterialsTotal > 0 && overallWorksPrice > 0
+          ? Math.round((p / overallWorksPrice) * orderMaterialsTotal * 100) / 100
+          : 0;
+
+      const totalEffectiveMaterial = m + orderMaterialShare;
+      const effectiveNet = Math.max(0, p - totalEffectiveMaterial);
+      const effectiveHelperSalary = Math.round((effectiveNet / 2) * 100) / 100;
+
       totalPrice += p;
-      totalMaterialCost += m;
-      totalHelperSalary += calc.helperSalary;
-      totalPainterSalary += calc.painterSalary;
+      totalMaterialCost += totalEffectiveMaterial;
+      totalHelperSalary += effectiveHelperSalary;
+
+      return {
+        ...w,
+        category: cat,
+        orderMaterialShare,
+        totalEffectiveMaterial,
+        effectiveNet,
+        effectiveHelperSalary,
+      };
     });
 
     return {
       category: cat,
-      works: list,
+      works: enrichedWorks,
       totalPrice,
       totalMaterialCost,
       totalHelperSalary,
-      totalPainterSalary,
       totalNet: Math.max(0, totalPrice - totalMaterialCost),
     };
   });

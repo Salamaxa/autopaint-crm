@@ -92,18 +92,15 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   // Overall payroll fund statistics calculated from orders
   const payrollStats = useMemo(() => {
     let helper = 0;
-    let painter = 0;
     let workMaterials = 0;
     orders.forEach((o) => {
       const sum = calculateOrderSalarySummary(o.works, o.materials);
       helper += sum.totalHelperSalary;
-      painter += sum.totalPainterSalary;
       workMaterials += sum.totalWorkMaterials;
     });
     return {
       helper,
-      painter,
-      total: helper + painter,
+      total: helper,
       workMaterials,
     };
   }, [orders]);
@@ -287,27 +284,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">
-              👨‍🔧 Нараховано Підготовщику:
-            </span>
-            <span className="text-lg font-black text-amber-400 font-mono">
-              {formatCurrency(payrollStats.helper)}
-            </span>
-            <span className="text-[10px] text-slate-500 block mt-0.5">50% від бази робіт</span>
-          </div>
-
-          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">
-              🎨 Нараховано Маляру:
-            </span>
-            <span className="text-lg font-black text-purple-400 font-mono">
-              {formatCurrency(payrollStats.painter)}
-            </span>
-            <span className="text-[10px] text-slate-500 block mt-0.5">50% від бази робіт</span>
-          </div>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
             <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">
               🧪 Матеріали за нарядами:
@@ -318,14 +295,14 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             <span className="text-[10px] text-slate-500 block mt-0.5">Собівартість робіт</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">
-              💼 Загальний фонд зарплат:
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+            <span className="text-[10px] text-amber-300 uppercase font-bold block mb-1">
+              👨‍🔧 Нараховано Підготовщику (50%):
             </span>
-            <span className="text-lg font-black text-white font-mono">
-              {formatCurrency(payrollStats.total)}
+            <span className="text-lg font-black text-amber-400 font-mono">
+              {formatCurrency(payrollStats.helper)}
             </span>
-            <span className="text-[10px] text-emerald-400 block mt-0.5">Підготовщик + Маляр</span>
+            <span className="text-[10px] text-amber-300/80 block mt-0.5">50% від чистої вартості (Ціна - Матеріали)</span>
           </div>
         </div>
       </div>

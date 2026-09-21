@@ -7,8 +7,56 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { Client, Vehicle, Order, InventoryItem, FinanceTransaction } from '../types';
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo:
+        auth.currentUser?.providerData?.map((provider) => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
+    },
+    operationType,
+    path,
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 export type FirestoreSyncStatus = 'connecting' | 'connected' | 'offline' | 'error';
 
@@ -58,6 +106,9 @@ class FirestoreSyncService {
           if (error?.code === 'unavailable' || msg.includes('unavailable') || msg.includes('offline')) {
             // Transient offline state: Firestore SDK will automatically reconnect in the background
             this.setStatus('offline');
+          } else if (msg.includes('Missing or insufficient permissions') || error?.code === 'permission-denied') {
+            this.setStatus('error');
+            handleFirestoreError(error, OperationType.GET, colName);
           } else {
             console.warn(`Firestore subscription error for [${colName}]:`, error);
             this.setStatus('error');
@@ -83,7 +134,11 @@ class FirestoreSyncService {
       const sanitized = JSON.parse(JSON.stringify(item));
       await setDoc(docRef, sanitized, { merge: true });
       this.setStatus('connected');
-    } catch (e) {
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === 'permission-denied' || err?.message?.includes('Missing or insufficient permissions')) {
+        handleFirestoreError(e, OperationType.WRITE, `${colName}/${item.id}`);
+      }
       console.error(`Failed to save to Firestore [${colName}/${item.id}]:`, e);
     }
   }
@@ -97,7 +152,11 @@ class FirestoreSyncService {
       const docRef = doc(db, colName, id);
       await deleteDoc(docRef);
       this.setStatus('connected');
-    } catch (e) {
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === 'permission-denied' || err?.message?.includes('Missing or insufficient permissions')) {
+        handleFirestoreError(e, OperationType.DELETE, `${colName}/${id}`);
+      }
       console.error(`Failed to delete from Firestore [${colName}/${id}]:`, e);
     }
   }

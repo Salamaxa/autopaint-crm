@@ -77,22 +77,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Payroll summary across all orders
   const payrollSummary = useMemo(() => {
     let helperTotal = 0;
-    let painterTotal = 0;
     let worksTotal = 0;
     let workMaterialsTotal = 0;
 
     orders.forEach((order) => {
       const summary = calculateOrderSalarySummary(order.works, order.materials);
       helperTotal += summary.totalHelperSalary;
-      painterTotal += summary.totalPainterSalary;
       worksTotal += summary.totalWorksPrice;
       workMaterialsTotal += summary.totalWorkMaterials;
     });
 
     return {
       helperTotal,
-      painterTotal,
-      totalPayroll: helperTotal + painterTotal,
       worksTotal,
       workMaterialsTotal,
     };
@@ -291,25 +287,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
             <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
-              👨‍🔧 ЗП Підготовщика:
+              💼 Сума робіт:
             </span>
-            <span className="text-lg font-black text-amber-400 font-mono">
-              {formatCurrency(payrollSummary.helperTotal)}
+            <span className="text-lg font-black text-white font-mono">
+              {formatCurrency(payrollSummary.worksTotal)}
             </span>
-            <span className="text-[10px] text-slate-500 block mt-0.5">Частка підготовки</span>
-          </div>
-
-          <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
-            <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
-              🎨 Частка Маляра:
-            </span>
-            <span className="text-lg font-black text-purple-400 font-mono">
-              {formatCurrency(payrollSummary.painterTotal)}
-            </span>
-            <span className="text-[10px] text-slate-500 block mt-0.5">Частка фарбування</span>
+            <span className="text-[10px] text-slate-500 block mt-0.5">Всі наряди</span>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
@@ -322,14 +308,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] text-slate-500 block mt-0.5">Списано на роботи</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
-            <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
-              💼 Загальний ФОП робіт:
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+            <span className="text-[10px] text-amber-300 font-bold uppercase block mb-1">
+              👨‍🔧 ЗП Підготовщика (50%):
             </span>
-            <span className="text-lg font-black text-white font-mono">
-              {formatCurrency(payrollSummary.totalPayroll)}
+            <span className="text-lg font-black text-amber-400 font-mono">
+              {formatCurrency(payrollSummary.helperTotal)}
             </span>
-            <span className="text-[10px] text-emerald-400 block mt-0.5">Всі наряди</span>
+            <span className="text-[10px] text-amber-300/80 block mt-0.5">(Ціна - Матеріали) / 2</span>
           </div>
         </div>
       </div>
@@ -391,13 +377,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       const orderSalary = calculateOrderSalarySummary(order.works, order.materials);
                       return (
                         <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-                          <span className="text-slate-500">Зарплати:</span>
+                          <span className="text-slate-500">Зарплата:</span>
                           <span className="text-amber-400 font-mono font-medium">
                             👨‍🔧 Підготовщик: {formatCurrency(orderSalary.totalHelperSalary)}
-                          </span>
-                          <span className="text-slate-600">•</span>
-                          <span className="text-purple-400 font-mono font-medium">
-                            🎨 Маляр: {formatCurrency(orderSalary.totalPainterSalary)}
                           </span>
                         </div>
                       );

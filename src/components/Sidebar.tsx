@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Boxes,
   Wallet,
-  Coins,
   Paintbrush,
   Database,
   Sparkles,
@@ -70,12 +69,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'finances' as ActiveTab,
       label: 'Фінанси',
       icon: Wallet,
-      badge: null,
-    },
-    {
-      id: 'payroll' as ActiveTab,
-      label: 'Заробітна плата',
-      icon: Coins,
       badge: null,
     },
   ];

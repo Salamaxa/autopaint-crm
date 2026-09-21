@@ -6,7 +6,6 @@ import {
   Car,
   Boxes,
   Wallet,
-  Coins,
   Paintbrush,
   Database,
   Menu,
@@ -38,7 +37,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({
     { id: 'vehicles' as ActiveTab, label: 'Авто', icon: Car },
     { id: 'inventory' as ActiveTab, label: 'Склад', icon: Boxes, badge: lowStockCount },
     { id: 'finances' as ActiveTab, label: 'Фінанси', icon: Wallet },
-    { id: 'payroll' as ActiveTab, label: 'Зарплата', icon: Coins },
   ];
 
   return (

@@ -224,8 +224,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const [paidAmount, setPaidAmount] = useState<string>('0');
   const [notes, setNotes] = useState('');
 
-  // Tab for viewing order modal: 'order' (clean work order) vs 'salary' (dedicated payroll tab)
-  const [orderModalTab, setOrderModalTab] = useState<'order' | 'salary'>('order');
+  // Tab for viewing order modal: 'order' (clean work order) vs 'materials' (spent materials) vs 'salary' (dedicated payroll tab)
+  const [orderModalTab, setOrderModalTab] = useState<'order' | 'materials' | 'salary'>('order');
 
   // Dynamic user-customizable sections in the order form
   const [formSections, setFormSections] = useState<string[]>([
@@ -257,7 +257,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     return parts.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
   }, [parts]);
 
-  const totalCalculated = worksTotal + materialsTotal + partsTotal;
+  // Вартість витрачених матеріалів та деталей наряду НЕ додаємо до загальної суми наряду
+  const totalCalculated = worksTotal + partsTotal;
 
   // Active form salary calculation summary
   const formSalarySummary = useMemo(() => {
@@ -451,7 +452,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         price: p,
         materialCost: m,
         helperSalary: typeof w.helperSalary === 'number' ? w.helperSalary : calc.helperSalary,
-        painterSalary: typeof w.painterSalary === 'number' ? w.painterSalary : calc.painterSalary,
       };
     });
 
@@ -516,7 +516,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         price: p,
         materialCost: 0,
         helperSalary: calc.helperSalary,
-        painterSalary: calc.painterSalary,
       },
     ]);
   };
@@ -533,7 +532,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           updated.price = p;
           updated.materialCost = m;
           updated.helperSalary = calc.helperSalary;
-          updated.painterSalary = calc.painterSalary;
         }
         return updated;
       })
@@ -552,7 +550,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         setMaterials([
           ...materials,
           {
-            id: 'm-' + Date.now(),
+            id: 'm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
             inventoryId: inv.id,
             name: inv.name,
             quantity: 1,
@@ -568,7 +566,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     setMaterials([
       ...materials,
       {
-        id: 'm-' + Date.now(),
+        id: 'm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
         name: '',
         quantity: 1,
         unit: 'шт',
@@ -576,6 +574,23 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         total: 0,
       },
     ]);
+  };
+
+  const updateMaterial = (id: string, patch: Partial<OrderMaterialItem>) => {
+    setMaterials((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        const updated = { ...m, ...patch };
+        const q = Number(updated.quantity) || 0;
+        const p = Number(updated.price) || 0;
+        updated.total = q * p;
+        return updated;
+      })
+    );
+  };
+
+  const deleteMaterial = (id: string) => {
+    setMaterials((prev) => prev.filter((m) => m.id !== id));
   };
 
   const handleAddPart = () => {
@@ -608,7 +623,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         price: p,
         materialCost: m,
         helperSalary: calc.helperSalary,
-        painterSalary: calc.painterSalary,
       };
     });
 
@@ -870,13 +884,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">
-                        Зарплати:
+                        Зарплата:
                       </span>
                       <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 font-mono font-semibold border border-amber-500/25 text-[11px]">
                         👨‍🔧 Підготовщик: {formatCurrency(salarySummary.totalHelperSalary)}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 font-mono font-semibold border border-purple-500/25 text-[11px]">
-                        🎨 Маляр: {formatCurrency(salarySummary.totalPainterSalary)}
                       </span>
                       <span className="px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 font-mono text-[11px] border border-blue-500/25">
                         🧪 Матеріали робіт: {formatCurrency(salarySummary.totalWorkMaterials)}
@@ -884,7 +895,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                     </div>
 
                     <div className="text-[11px] text-slate-400 font-mono">
-                      ФОП наряду: <strong className="text-white">{formatCurrency(salarySummary.totalPayroll)}</strong>
+                      Формула: <span className="text-amber-300 font-semibold">(Ціна - Матеріали) / 2</span>
                     </div>
                   </div>
 
@@ -1503,6 +1514,136 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             </div>
           </div>
 
+          {/* SECTION: Materials (Витрачені матеріали та деталі наряду) */}
+          <div className="space-y-3 pt-2 border-t border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <Boxes className="w-4 h-4 text-blue-400" />
+                  Витрачені матеріали та деталі наряду ({materials.length})
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Собівартість матеріалів не додається до загальної суми наряду
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {inventory.length > 0 && (
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddMaterial(e.target.value);
+                        e.target.value = '';
+                      }
+                    }}
+                    defaultValue=""
+                    className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-blue-300 border border-blue-500/30 text-xs font-semibold transition-colors focus:outline-none"
+                  >
+                    <option value="" disabled>
+                      + Додати зі складу...
+                    </option>
+                    {inventory.map((inv) => (
+                      <option key={inv.id} value={inv.id}>
+                        {inv.name} ({inv.quantity} {inv.unit} · {inv.price} ₴)
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleAddMaterial()}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 text-xs font-semibold transition-colors self-start sm:self-auto"
+                >
+                  <Plus className="w-3.5 h-3.5" /> + Додати матеріал
+                </button>
+              </div>
+            </div>
+
+            {materials.length === 0 ? (
+              <div className="p-3.5 rounded-xl border border-dashed border-slate-800 bg-slate-950/40 text-center">
+                <p className="text-xs text-slate-400">
+                  Витрачені матеріали ще не додано.{' '}
+                  <button
+                    type="button"
+                    onClick={() => handleAddMaterial()}
+                    className="text-blue-400 hover:underline font-semibold"
+                  >
+                    Додати матеріал
+                  </button>
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                <div className="grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-slate-400 px-1">
+                  <div className="col-span-5">Матеріал</div>
+                  <div className="col-span-2 text-center">К-сть / од.</div>
+                  <div className="col-span-2 text-right">Ціна (₴)</div>
+                  <div className="col-span-2 text-right">Сума (₴)</div>
+                  <div className="col-span-1 text-center"></div>
+                </div>
+
+                {materials.map((m) => (
+                  <div key={m.id} className="grid grid-cols-12 gap-2 items-center text-xs">
+                    <div className="col-span-5">
+                      <input
+                        type="text"
+                        placeholder="Назва матеріалу..."
+                        value={m.name}
+                        onChange={(e) => updateMaterial(m.id, { name: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="col-span-2 flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={m.quantity}
+                        onChange={(e) => updateMaterial(m.id, { quantity: Number(e.target.value) || 0 })}
+                        className="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-center font-mono text-white focus:outline-none focus:border-blue-500"
+                      />
+                      <input
+                        type="text"
+                        value={m.unit}
+                        onChange={(e) => updateMaterial(m.id, { unit: e.target.value })}
+                        className="w-10 px-1 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px] text-center text-slate-300 focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={m.price}
+                        onChange={(e) => updateMaterial(m.id, { price: Number(e.target.value) || 0 })}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-right font-mono text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="col-span-2 font-mono font-bold text-blue-400 text-right">
+                      {formatCurrency(m.total)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteMaterial(m.id)}
+                      className="col-span-1 p-1 text-slate-500 hover:text-rose-400 text-center transition-colors"
+                      title="Видалити матеріал"
+                    >
+                      <Trash className="w-4 h-4 mx-auto" />
+                    </button>
+                  </div>
+                ))}
+
+                <div className="flex justify-between items-center px-3 py-2 rounded-lg bg-slate-950/80 border border-slate-800 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 font-semibold">Разом витрачених матеріалів:</span>
+                    <span className="text-[10px] text-slate-500">(не додається до загальної суми)</span>
+                  </div>
+                  <span className="font-mono font-black text-blue-400 text-sm">
+                    {formatCurrency(materialsTotal)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* SECTION: Parts (Запчастини) */}
           <div className="space-y-3 pt-2 border-t border-slate-800">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1616,8 +1757,32 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
           {/* Payment & Totals Section */}
           <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-300 font-semibold">Загальна сума до оплати клієнтом:</span>
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center justify-between text-slate-300">
+                <span>Вартість робіт:</span>
+                <span className="font-mono font-bold text-white">{formatCurrency(worksTotal)}</span>
+              </div>
+              {partsTotal > 0 && (
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Вартість запчастин:</span>
+                  <span className="font-mono font-bold text-amber-400">{formatCurrency(partsTotal)}</span>
+                </div>
+              )}
+              {materialsTotal > 0 && (
+                <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                  <span>Витрачені матеріали (не додаються до суми наряду):</span>
+                  <span className="font-mono text-blue-400 font-semibold">{formatCurrency(materialsTotal)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-800/80">
+              <div>
+                <span className="text-slate-200 font-bold block">Загальна сума до оплати клієнтом:</span>
+                <span className="text-[11px] text-slate-400 font-normal">
+                  (сума матеріалів не додається до наряду)
+                </span>
+              </div>
               <span className="text-xl font-black text-white font-mono">{formatCurrency(totalCalculated)}</span>
             </div>
 
@@ -1707,11 +1872,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             return (
               <div className="space-y-4">
                 {/* Modal Tab Switcher */}
-                <div className="flex border-b border-slate-800 -mt-2 gap-2">
+                <div className="flex border-b border-slate-800 -mt-2 gap-2 overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => setOrderModalTab('order')}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all whitespace-nowrap ${
                       orderModalTab === 'order'
                         ? 'border-amber-400 text-amber-400 bg-amber-400/5'
                         : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -1722,8 +1887,25 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   </button>
                   <button
                     type="button"
+                    onClick={() => setOrderModalTab('materials')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all whitespace-nowrap ${
+                      orderModalTab === 'materials'
+                        ? 'border-blue-400 text-blue-400 bg-blue-400/5'
+                        : 'border-transparent text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Boxes className="w-4 h-4" />
+                    Витрачені матеріали
+                    {viewingOrder.materials && viewingOrder.materials.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-500/20 text-blue-300 font-mono font-bold">
+                        {viewingOrder.materials.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setOrderModalTab('salary')}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all whitespace-nowrap ${
                       orderModalTab === 'salary'
                         ? 'border-amber-400 text-amber-400 bg-amber-400/5'
                         : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -1964,7 +2146,29 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
                     {/* Order Payment Summary Box */}
                     <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
-                      <div className="flex justify-between text-slate-300">
+                      <div className="flex justify-between text-slate-400">
+                        <span>Сума робіт:</span>
+                        <span className="font-bold font-mono text-slate-200">
+                          {formatCurrency(summary.totalWorksPrice)}
+                        </span>
+                      </div>
+                      {viewingOrder.parts && viewingOrder.parts.length > 0 && (
+                        <div className="flex justify-between text-slate-400">
+                          <span>Запчастини:</span>
+                          <span className="font-bold font-mono text-amber-400">
+                            {formatCurrency(viewingOrder.parts.reduce((sum, p) => sum + (Number(p.total) || 0), 0))}
+                          </span>
+                        </div>
+                      )}
+                      {viewingOrder.materials && viewingOrder.materials.length > 0 && (
+                        <div className="flex justify-between text-slate-500 text-[11px]">
+                          <span>Витрачені матеріали (не додаються до суми наряду):</span>
+                          <span className="font-mono text-blue-400">
+                            {formatCurrency(summary.totalOrderMaterials)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-slate-200 pt-1.5 border-t border-slate-800 font-semibold">
                         <span>Загальна сума наряду до сплати:</span>
                         <span className="font-bold text-base text-white font-mono">
                           {formatCurrency(viewingOrder.totalAmount)}
@@ -1992,7 +2196,151 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   </div>
                 )}
 
-                {/* TAB 2: ЗАРОБІТНЯ ПЛАТА (Окремий простір розрахунку винагород і матеріалів) */}
+                {/* TAB 2: ВИТРАЧЕНІ МАТЕРІАЛИ (Вкладка Витрачені матеріали та деталі наряду) */}
+                {orderModalTab === 'materials' && (
+                  <div className="space-y-4">
+                    {/* Header Info Banner */}
+                    <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-blue-500/20 text-blue-300 shrink-0 mt-0.5">
+                        <Boxes className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">
+                          Витрачені матеріали та деталі наряду
+                        </h4>
+                        <p className="text-xs text-slate-300 mt-0.5">
+                          Облік витрачених матеріалів та компонентів цеху на замовлення.{' '}
+                          <strong className="text-blue-300">
+                            Вартість витрачених матеріалів не додається до загальної суми наряду для клієнта.
+                          </strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Stat Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Кількість позицій:</span>
+                        <span className="text-sm font-black text-white font-mono mt-0.5 block">
+                          {(viewingOrder.materials || []).length} поз.
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Сума матеріалів:</span>
+                        <span className="text-sm font-black text-blue-400 font-mono mt-0.5 block">
+                          {formatCurrency(summary.totalOrderMaterials)}
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Матеріали в роботах (ЗП):</span>
+                        <span className="text-sm font-black text-slate-200 font-mono mt-0.5 block">
+                          {formatCurrency(summary.totalWorkMaterials)}
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                        <span className="text-[10px] text-emerald-300 block uppercase font-bold">Включено в чек:</span>
+                        <span className="text-sm font-black text-emerald-400 font-mono mt-0.5 block">
+                          0 ₴ (не додається)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Materials Table */}
+                    {(!viewingOrder.materials || viewingOrder.materials.length === 0) ? (
+                      <div className="p-8 rounded-xl border border-dashed border-slate-800 bg-slate-950/40 text-center space-y-2">
+                        <Boxes className="w-8 h-8 text-slate-600 mx-auto" />
+                        <p className="text-sm font-semibold text-slate-300">
+                          У цьому наряді немає зафіксованих витрачених матеріалів
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Матеріали можна додати під час створення або редагування наряду зі складу або вручну.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                            <Boxes className="w-4 h-4 text-blue-400" />
+                            Перелік витрачених матеріалів та деталей наряду ({viewingOrder.materials.length})
+                          </h4>
+                          <span className="text-xs text-blue-400 font-mono font-semibold">
+                            Разом: {formatCurrency(summary.totalOrderMaterials)}
+                          </span>
+                        </div>
+
+                        <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-slate-900 text-slate-400 border-b border-slate-800 font-semibold">
+                              <tr>
+                                <th className="p-2.5 w-10 text-center">№</th>
+                                <th className="p-2.5">Найменування матеріалу</th>
+                                <th className="p-2.5 text-center">Кількість</th>
+                                <th className="p-2.5 text-right">Ціна за од.</th>
+                                <th className="p-2.5 text-right">Загальна сума</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {viewingOrder.materials.map((m, mIdx) => (
+                                <tr
+                                  key={m.id}
+                                  className={`transition-colors ${
+                                    mIdx % 2 === 1 ? 'bg-slate-900/30' : 'bg-transparent'
+                                  } hover:bg-slate-800/30`}
+                                >
+                                  <td className="p-2.5 text-center text-slate-500 font-mono text-[11px]">
+                                    {mIdx + 1}
+                                  </td>
+                                  <td className="p-2.5 text-slate-200 font-medium">
+                                    <div className="flex items-center gap-1.5">
+                                      <span>{m.name}</span>
+                                      {m.inventoryId && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-blue-300 border border-slate-700 font-mono">
+                                          Склад
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 text-center text-slate-400 font-mono">
+                                    {m.quantity} {m.unit}
+                                  </td>
+                                  <td className="p-2.5 text-right text-slate-400 font-mono">
+                                    {formatCurrency(m.price)}
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono text-white font-semibold">
+                                    {formatCurrency(m.total)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-slate-900/90 font-bold border-t border-slate-800 text-xs">
+                              <tr>
+                                <td colSpan={4} className="p-2.5 text-slate-300">
+                                  Разом витрачених матеріалів (не додається до суми наряду):
+                                </td>
+                                <td className="p-2.5 text-right font-mono text-blue-400 font-bold text-sm">
+                                  {formatCurrency(summary.totalOrderMaterials)}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notice */}
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 flex items-center gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
+                      <span>
+                        Суму за «Витрачені матеріали та деталі наряду» <strong>не додано</strong> до загальної вартості наряду для клієнта.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: ЗАРОБІТНЯ ПЛАТА (Окремий простір розрахунку винагород) */}
                 {orderModalTab === 'salary' && (
                   <div className="space-y-4">
                     {/* Header Info */}
@@ -2002,17 +2350,17 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-white">
-                          Заробітня плата та розрахунок фонду оплати праці
+                          Заробітна плата підготовщика
                         </h4>
                         <p className="text-xs text-slate-300 mt-0.5">
-                          Дані про зарплати та матеріали винесено в окрему вкладку. Наразі діє базовий розподіл{' '}
-                          <strong className="text-amber-300">(Ціна - Матеріали) / 2</strong> (50% підготовщик, 50% маляр).
+                          Розрахунок зарплати підготовщика за формулою:{' '}
+                          <strong className="text-amber-300">(Ціна роботи - Матеріали) / 2</strong>.
                         </p>
                       </div>
                     </div>
 
                     {/* Payroll Summary Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                       <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
                         <span className="text-[10px] text-slate-400 block uppercase font-bold">Сума робіт:</span>
                         <span className="text-sm font-black text-white font-mono mt-0.5 block">
@@ -2028,30 +2376,16 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       </div>
 
                       <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block uppercase font-bold">ЗП Підготовщика:</span>
-                        <span className="text-sm font-black text-amber-400 font-mono mt-0.5 block">
+                        <span className="text-[10px] text-slate-400 block uppercase font-bold">База для ЗП:</span>
+                        <span className="text-sm font-black text-slate-200 font-mono mt-0.5 block">
+                          {formatCurrency(Math.max(0, summary.totalWorksPrice - summary.totalWorkMaterials))}
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                        <span className="text-[10px] text-amber-300 block uppercase font-bold">ЗП Підготовщика (50%):</span>
+                        <span className="text-base font-black text-amber-400 font-mono mt-0.5 block">
                           {formatCurrency(summary.totalHelperSalary)}
-                        </span>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Частка Маляра:</span>
-                        <span className="text-sm font-black text-purple-400 font-mono mt-0.5 block">
-                          {formatCurrency(summary.totalPainterSalary)}
-                        </span>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Разом ЗП (ФОП):</span>
-                        <span className="text-sm font-black text-amber-300 font-mono mt-0.5 block">
-                          {formatCurrency(summary.totalPayroll)}
-                        </span>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Прибуток цеху:</span>
-                        <span className="text-sm font-black text-emerald-400 font-mono mt-0.5 block">
-                          {formatCurrency(summary.workshopProfit)}
                         </span>
                       </div>
                     </div>
@@ -2078,7 +2412,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                               <th className="p-2.5 text-right text-blue-300">Матеріали</th>
                               <th className="p-2.5 text-right">База для ЗП</th>
                               <th className="p-2.5 text-right text-amber-300">Підготовщик (50%)</th>
-                              <th className="p-2.5 text-right text-purple-300">Маляр (50%)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/60">
@@ -2090,7 +2423,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                                 <React.Fragment key={group.category}>
                                   {/* Section Header */}
                                   <tr className="bg-slate-950/90 border-t border-b border-slate-800">
-                                    <td colSpan={7} className="p-2.5">
+                                    <td colSpan={6} className="p-2.5">
                                       <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div className="flex items-center gap-2">
                                           <span className={`p-1 rounded-md ${meta.badge}`}>
@@ -2155,9 +2488,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                                         <td className="p-2.5 text-right font-mono text-amber-300 font-semibold">
                                           {formatCurrency(calc.helperSalary)}
                                         </td>
-                                        <td className="p-2.5 text-right font-mono text-purple-300 font-semibold">
-                                          {formatCurrency(calc.painterSalary)}
-                                        </td>
                                       </tr>
                                     );
                                   })}
@@ -2178,9 +2508,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                                     </td>
                                     <td className="p-2 text-right font-mono text-amber-300/90 font-semibold">
                                       {formatCurrency(group.totalHelperSalary)}
-                                    </td>
-                                    <td className="p-2 text-right font-mono text-purple-300/90 font-semibold">
-                                      {formatCurrency(group.totalPainterSalary)}
                                     </td>
                                   </tr>
                                 </React.Fragment>
@@ -2205,83 +2532,17 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                               <td className="p-2.5 text-right font-mono text-amber-300 font-bold text-sm">
                                 {formatCurrency(summary.totalHelperSalary)}
                               </td>
-                              <td className="p-2.5 text-right font-mono text-purple-300 font-bold text-sm">
-                                {formatCurrency(summary.totalPainterSalary)}
-                              </td>
                             </tr>
                           </tfoot>
                         </table>
                       </div>
                     </div>
 
-                    {/* Materials Breakdown Section (Перенесено в ЗП після відомостей нарахування) */}
-                    {viewingOrder.materials && viewingOrder.materials.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                            <Boxes className="w-4 h-4 text-amber-400" />
-                            Витрачені матеріали та деталі наряду ({viewingOrder.materials.length})
-                          </h4>
-                          <span className="text-xs text-blue-400 font-mono font-semibold">
-                            Разом матеріалів: {formatCurrency(summary.totalOrderMaterials)}
-                          </span>
-                        </div>
-                        <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
-                          <table className="w-full text-xs text-left">
-                            <thead className="bg-slate-900 text-slate-400 border-b border-slate-800 font-semibold">
-                              <tr>
-                                <th className="p-2.5 w-10 text-center">№</th>
-                                <th className="p-2.5">Найменування матеріалу</th>
-                                <th className="p-2.5 text-center">Кількість</th>
-                                <th className="p-2.5 text-right">Ціна за од.</th>
-                                <th className="p-2.5 text-right">Загальна сума</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/60">
-                              {viewingOrder.materials.map((m, mIdx) => (
-                                <tr
-                                  key={m.id}
-                                  className={`transition-colors ${
-                                    mIdx % 2 === 1 ? 'bg-slate-900/30' : 'bg-transparent'
-                                  } hover:bg-slate-800/30`}
-                                >
-                                  <td className="p-2.5 text-center text-slate-500 font-mono text-[11px]">
-                                    {mIdx + 1}
-                                  </td>
-                                  <td className="p-2.5 text-slate-200 font-medium">{m.name}</td>
-                                  <td className="p-2.5 text-center text-slate-400 font-mono">
-                                    {m.quantity} {m.unit}
-                                  </td>
-                                  <td className="p-2.5 text-right text-slate-400 font-mono">
-                                    {formatCurrency(m.price)}
-                                  </td>
-                                  <td className="p-2.5 text-right font-mono text-white font-semibold">
-                                    {formatCurrency(m.total)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot className="bg-slate-900/90 font-bold border-t border-slate-800 text-xs">
-                              <tr>
-                                <td colSpan={4} className="p-2.5 text-slate-300">
-                                  Разом додаткових матеріалів зі складу:
-                                </td>
-                                <td className="p-2.5 text-right font-mono text-blue-400 font-bold text-sm">
-                                  {formatCurrency(summary.totalOrderMaterials)}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Bottom Status Banner */}
                     <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 flex items-center gap-2.5">
                       <Coins className="w-4 h-4 text-amber-400 shrink-0" />
                       <span>
-                        Вкладку <strong>«Заробітня плата»</strong> підготовлено! Повідомте ваші подальші вказівки
-                        щодо логіки закріплення конкретних працівників або зміни нарахувань.
+                        Розрахунок винагороди: нараховується <strong>лише зарплата підготовщика (50% від чистої вартості роботи після вирахування матеріалів)</strong>.
                       </span>
                     </div>
                   </div>

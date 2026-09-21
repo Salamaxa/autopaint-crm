@@ -50,8 +50,7 @@ export interface OrderWorkItem {
   title: string; // Назва роботи (наприклад, "пофарбування бампера")
   price: number; // Ціна роботи в ₴
   materialCost: number; // Вартість використаних матеріалів на цю роботу в ₴
-  helperSalary: number; // Автоматично розрахована зарплата підготовщика: (ціна - матеріали) / 2
-  painterSalary: number; // Автоматично розрахована частка маляра: (ціна - матеріали) / 2
+  helperSalary: number; // Зарплата підготовщика: (ціна - матеріали) / 2
   notes?: string;
 }
 
@@ -138,5 +137,4 @@ export type ActiveTab =
   | 'vehicles'
   | 'orders'
   | 'inventory'
-  | 'finances'
-  | 'payroll';
+  | 'finances';

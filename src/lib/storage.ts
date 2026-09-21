@@ -166,7 +166,6 @@ class StorageService {
         price,
         materialCost,
         helperSalary: calc.helperSalary,
-        painterSalary: calc.painterSalary,
       };
     });
 
@@ -177,7 +176,8 @@ class StorageService {
       const deliveryCost = Number(p.deliveryCost) || 0;
       return sum + (p.total !== undefined ? Number(p.total) : price + deliveryCost);
     }, 0);
-    const totalAmount = worksTotal + materialsTotal + partsTotal;
+    // Вартість витрачених матеріалів та деталей наряду не додається до загальної суми наряду
+    const totalAmount = worksTotal + partsTotal;
     const paidAmount = Number(order.paidAmount) || 0;
     const remainingAmount = Math.max(0, totalAmount - paidAmount);
 
