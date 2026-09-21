@@ -104,11 +104,13 @@ export type InventoryCategory =
 export interface InventoryItem {
   id: string;
   name: string;
+  sku?: string; // Артикул або код товару
   category: InventoryCategory;
   unit: string; // л, мл, кг, г, шт, балон, рулон
   quantity: number;
   minQuantity: number; // Поріг попередження
   price: number; // Собівартість / ціна закупівлі
+  retailPrice?: number; // Роздрібна ціна
   supplier?: string;
   notes?: string;
   updatedAt: string;

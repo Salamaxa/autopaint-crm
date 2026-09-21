@@ -37,11 +37,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   // Form State
   const [name, setName] = useState('');
+  const [sku, setSku] = useState('');
   const [category, setCategory] = useState<InventoryCategory>('clearcoats');
   const [unit, setUnit] = useState('шт');
   const [quantity, setQuantity] = useState<string>('1');
   const [minQuantity, setMinQuantity] = useState<string>('1');
   const [price, setPrice] = useState<string>('0');
+  const [retailPrice, setRetailPrice] = useState<string>('0');
   const [supplier, setSupplier] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -73,11 +75,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const openCreateModal = () => {
     setName('');
+    setSku('');
     setCategory('clearcoats');
     setUnit('л');
     setQuantity('1');
     setMinQuantity('2');
     setPrice('500');
+    setRetailPrice('0');
     setSupplier('');
     setNotes('');
     setIsCreateOpen(true);
@@ -86,11 +90,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const openEditModal = (item: InventoryItem) => {
     setEditingItem(item);
     setName(item.name);
+    setSku(item.sku || '');
     setCategory(item.category);
     setUnit(item.unit);
     setQuantity(String(item.quantity));
     setMinQuantity(String(item.minQuantity));
     setPrice(String(item.price));
+    setRetailPrice(String(item.retailPrice ?? item.price));
     setSupplier(item.supplier || '');
     setNotes(item.notes || '');
   };
@@ -111,11 +117,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     const newItem: InventoryItem = {
       id: editingItem ? editingItem.id : 'inv-' + Date.now(),
       name: name.trim(),
+      sku: sku.trim() || undefined,
       category,
       unit: unit.trim(),
       quantity: Number(quantity) || 0,
       minQuantity: Number(minQuantity) || 1,
       price: Number(price) || 0,
+      retailPrice: Number(retailPrice) || 0,
       supplier: supplier.trim() || undefined,
       notes: notes.trim() || undefined,
       updatedAt: new Date().toISOString(),
@@ -226,9 +234,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <table className="w-full text-xs text-left border-collapse">
               <thead className="bg-[#131b2e] text-slate-400 border-b border-slate-800 uppercase tracking-wider text-[11px] font-semibold">
                 <tr>
-                  <th className="p-3.5">Матеріал / Категорія</th>
+                  <th className="p-3.5">Артикул / Найменування</th>
                   <th className="p-3.5 text-center">Залишок</th>
-                  <th className="p-3.5 text-right">Ціна за од.</th>
+                  <th className="p-3.5 text-center">Мін. залишок</th>
+                  <th className="p-3.5 text-right">Закупівля</th>
+                  <th className="p-3.5 text-right">Роздріб</th>
                   <th className="p-3.5 text-right">Сума</th>
                   <th className="p-3.5 text-center">Швидка зміна</th>
                   <th className="p-3.5 text-right">Дії</th>
@@ -243,6 +253,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <tr key={item.id} className="hover:bg-slate-900/50 transition-colors">
                       {/* Name and Category */}
                       <td className="p-3.5">
+                        <div className="text-[11px] text-slate-400 mb-1">{item.sku || 'Без артикулу'}</div>
                         <div className="font-bold text-white text-sm">{item.name}</div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60">
@@ -283,9 +294,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </div>
                       </td>
 
-                      {/* Unit Price */}
+                      <td className="p-3.5 text-center font-mono text-slate-300">
+                        {item.minQuantity} {item.unit}
+                      </td>
+
                       <td className="p-3.5 text-right font-mono text-slate-200">
                         {formatCurrency(item.price)}
+                      </td>
+
+                      <td className="p-3.5 text-right font-mono text-blue-300">
+                        {formatCurrency(item.retailPrice ?? item.price)}
                       </td>
 
                       {/* Total Value */}
@@ -358,6 +376,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              Артикул / код товару
+            </label>
+            <input
+              type="text"
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
+              placeholder="напр. CLR-610-1L"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
               Назва матеріалу *
             </label>
             <input
@@ -403,7 +434,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                 Кількість *
@@ -436,7 +467,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Ціна (₴) *
+                Закупівля (₴) *
               </label>
               <input
                 type="number"
@@ -444,6 +475,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 required
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm font-mono text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Роздріб (₴)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={retailPrice}
+                onChange={(e) => setRetailPrice(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm font-mono text-white focus:outline-none focus:border-amber-500"
               />
             </div>
