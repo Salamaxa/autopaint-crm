@@ -9,18 +9,18 @@ import {
   ArrowUpDown,
   Filter,
   Package,
+  PackageMinus,
+  PackagePlus,
   Layers,
+  ClipboardCheck,
   Sparkles,
-  PlusCircle,
-  MinusCircle,
 } from 'lucide-react';
 import { InventoryItem, InventoryCategory } from '../types';
 import { Modal } from './Modal';
-import { formatCurrency, INVENTORY_CATEGORIES } from '../lib/formatters';
 
 interface InventoryViewProps {
-  inventory: InventoryItem[];
   onSaveItem: (item: InventoryItem) => void;
+
   onDeleteItem: (id: string) => void;
 }
 
@@ -32,8 +32,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [activeSection, setActiveSection] = useState<'stock' | 'receipt' | 'writeoff' | 'inventory'>('stock');
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [movementItemId, setMovementItemId] = useState('');
+  const [movementQuantity, setMovementQuantity] = useState('');
+  const [movementPrice, setMovementPrice] = useState('');
+  const [movementNote, setMovementNote] = useState('');
+  const [movementMessage, setMovementMessage] = useState<string | null>(null);
+  const [countItemId, setCountItemId] = useState('');
+  const [countQuantity, setCountQuantity] = useState('');
+  const [countNote, setCountNote] = useState('');
 
   // Form State
   const [name, setName] = useState('');
@@ -110,6 +119,57 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     });
   };
 
+  const handleMovement = (event: React.FormEvent) => {
+    event.preventDefault();
+    const item = inventory.find((entry) => entry.id === movementItemId);
+    const amount = Number(movementQuantity);
+    if (!item || !amount || amount <= 0) return;
+
+    if (activeSection === 'writeoff' && amount > item.quantity) {
+      setMovementMessage(`Недостатньо залишку. Доступно лише ${item.quantity} ${item.unit}.`);
+      return;
+    }
+
+    const nextQuantity = activeSection === 'receipt'
+      ? item.quantity + amount
+      : item.quantity - amount;
+
+    onSaveItem({
+      ...item,
+      quantity: Math.round(nextQuantity * 100) / 100,
+      price: activeSection === 'receipt' && Number(movementPrice) > 0
+        ? Number(movementPrice)
+        : item.price,
+      updatedAt: new Date().toISOString(),
+      notes: movementNote.trim() || item.notes,
+    });
+
+    setMovementMessage(
+      `${activeSection === 'receipt' ? 'Оприбутковано' : 'Списано'} ${amount} ${item.unit}: ${item.name}`
+    );
+    setMovementQuantity('');
+    setMovementPrice('');
+    setMovementNote('');
+  };
+
+  const handleInventoryCount = (event: React.FormEvent) => {
+    event.preventDefault();
+    const item = inventory.find((entry) => entry.id === countItemId);
+    const countedQuantity = Number(countQuantity);
+    if (!item || Number.isNaN(countedQuantity) || countedQuantity < 0) return;
+
+    const difference = countedQuantity - item.quantity;
+    onSaveItem({
+      ...item,
+      quantity: Math.round(countedQuantity * 100) / 100,
+      updatedAt: new Date().toISOString(),
+      notes: countNote.trim() || item.notes,
+    });
+    setMovementMessage(`Інвентаризацію проведено: ${item.name}. Різниця ${difference >= 0 ? '+' : ''}${difference} ${item.unit}.`);
+    setCountQuantity('');
+    setCountNote('');
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -157,6 +217,131 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </button>
       </div>
 
+      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+        {[
+          { id: 'stock', label: 'Залишки', icon: Boxes },
+          { id: 'receipt', label: 'Оприбуткування', icon: PackagePlus },
+          { id: 'writeoff', label: 'Списання', icon: PackageMinus },
+          { id: 'inventory', label: 'Інвентаризація', icon: ClipboardCheck },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => {
+              setActiveSection(id as 'stock' | 'receipt' | 'writeoff' | 'inventory');
+              setMovementMessage(null);
+            }}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+              activeSection === id
+                ? id === 'writeoff'
+                  ? 'border-rose-500/60 bg-rose-500/10 text-rose-300'
+                  : id === 'receipt'
+                    ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300'
+                    : 'border-amber-500/60 bg-amber-500/10 text-amber-300'
+                : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {(activeSection === 'receipt' || activeSection === 'writeoff') && (
+        <form onSubmit={handleMovement} className="rounded-xl border border-slate-800 bg-[#111827] p-4 sm:p-5 space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              {activeSection === 'receipt' ? <PackagePlus className="h-5 w-5 text-emerald-400" /> : <PackageMinus className="h-5 w-5 text-rose-400" />}
+              {activeSection === 'receipt' ? 'Оприбуткування товару' : 'Списання товару'}
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">
+              {activeSection === 'receipt'
+                ? 'Додайте отриману кількість до залишку складу.'
+                : 'Зменшіть залишок через використання, брак або іншу причину.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <select
+              required
+              value={movementItemId}
+              onChange={(event) => setMovementItemId(event.target.value)}
+              className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+            >
+              <option value="">Оберіть товар *</option>
+              {inventory.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} ({item.quantity} {item.unit})
+                </option>
+              ))}
+            </select>
+            <input
+              required
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={movementQuantity}
+              onChange={(event) => setMovementQuantity(event.target.value)}
+              placeholder="Кількість *"
+              className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            />
+            {activeSection === 'receipt' && (
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={movementPrice}
+                onChange={(event) => setMovementPrice(event.target.value)}
+                placeholder="Нова ціна закупівлі"
+                className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+              />
+            )}
+            <input
+              type="text"
+              value={movementNote}
+              onChange={(event) => setMovementNote(event.target.value)}
+              placeholder="Підстава / примітка"
+              className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {movementMessage && <p className="text-sm text-emerald-300">{movementMessage}</p>}
+            <button
+              type="submit"
+              className={`rounded-xl px-5 py-2.5 text-sm font-bold text-slate-950 transition-colors ${activeSection === 'receipt' ? 'bg-emerald-400 hover:bg-emerald-300' : 'bg-rose-400 hover:bg-rose-300'}`}
+            >
+              {activeSection === 'receipt' ? 'Провести оприбуткування' : 'Провести списання'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {activeSection === 'inventory' && (
+        <form onSubmit={handleInventoryCount} className="rounded-xl border border-slate-800 bg-[#111827] p-4 sm:p-5 space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-sky-400" />
+              Проведення інвентаризації
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">Звірте фактичний залишок із даними системи та зафіксуйте різницю.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <select required value={countItemId} onChange={(event) => setCountItemId(event.target.value)} className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+              <option value="">Оберіть товар *</option>
+              {inventory.map((item) => <option key={item.id} value={item.id}>{item.name} (облік: {item.quantity} {item.unit})</option>)}
+            </select>
+            <input required type="number" min="0" step="0.01" value={countQuantity} onChange={(event) => setCountQuantity(event.target.value)} placeholder="Фактична кількість *" className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500" />
+            <input type="text" value={countNote} onChange={(event) => setCountNote(event.target.value)} placeholder="Коментар перевірки" className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500" />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {movementMessage && <p className="text-sm text-sky-300">{movementMessage}</p>}
+            <button type="submit" className="rounded-xl bg-sky-400 px-5 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-sky-300">Зафіксувати залишок</button>
+          </div>
+        </form>
+      )}
+
+      {activeSection === 'stock' && <>
       {/* Stats Summary Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 rounded-xl bg-[#111827] border border-slate-800 flex items-center justify-between">
@@ -240,7 +425,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <th className="p-3.5 text-right">Закупівля</th>
                   <th className="p-3.5 text-right">Роздріб</th>
                   <th className="p-3.5 text-right">Сума</th>
-                  <th className="p-3.5 text-center">Швидка зміна</th>
                   <th className="p-3.5 text-right">Дії</th>
                 </tr>
               </thead>
@@ -311,26 +495,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         {formatCurrency(itemTotal)}
                       </td>
 
-                      {/* Quick Adjust Buttons */}
-                      <td className="p-3.5 text-center">
-                        <div className="inline-flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1">
-                          <button
-                            onClick={() => handleQuickAdjust(item, -1)}
-                            className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
-                            title="Списати 1 од."
-                          >
-                            <MinusCircle className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleQuickAdjust(item, 1)}
-                            className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
-                            title="Додати 1 од."
-                          >
-                            <PlusCircle className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-
                       {/* Actions */}
                       <td className="p-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -362,6 +526,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </div>
       )}
+      </>}
 
       {/* Modal: Create or Edit Item */}
       <Modal
