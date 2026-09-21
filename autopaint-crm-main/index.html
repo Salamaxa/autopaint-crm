@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="uk" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <script>
+      // Protection for sandboxed iframe environments where window.fetch is configured with only a getter
+      (function() {
+        try {
+          var originalDesc = Object.getOwnPropertyDescriptor(window, 'fetch');
+          if (!originalDesc) {
+            var proto = Object.getPrototypeOf(window);
+            while (proto && !originalDesc) {
+              originalDesc = Object.getOwnPropertyDescriptor(proto, 'fetch');
+              proto = Object.getPrototypeOf(proto);
+            }
+          }
+
+          var nativeFetch = window.fetch ? window.fetch.bind(window) : null;
+          var customFetch = nativeFetch;
+
+          // If fetch has a getter without a setter or is non-writable, redefine with both getter and setter
+          if (!originalDesc || !originalDesc.set) {
+            try {
+              Object.defineProperty(window, 'fetch', {
+                get: function() {
+                  return customFetch || nativeFetch;
+                },
+                set: function(val) {
+                  customFetch = val;
+                },
+                configurable: true,
+                enumerable: true,
+              });
+            } catch (e1) {
+              try {
+                if (typeof Window !== 'undefined' && Window.prototype) {
+                  Object.defineProperty(Window.prototype, 'fetch', {
+                    get: function() {
+                      return customFetch || nativeFetch;
+                    },
+                    set: function(val) {
+                      customFetch = val;
+                    },
+                    configurable: true,
+                    enumerable: true,
+                  });
+                }
+              } catch (e2) {}
+            }
+          }
+        } catch (e) {}
+
+        // Global error guard to catch and suppress any unhandled "Cannot set property fetch" errors
+        window.addEventListener(
+          'error',
+          function(e) {
+            var msg = (e && e.message) || (e && e.error && e.error.message) || '';
+            if (typeof msg === 'string' && msg.indexOf('fetch') !== -1 && msg.indexOf('only a getter') !== -1) {
+              if (e.preventDefault) e.preventDefault();
+              if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+              return true;
+            }
+          },
+          true
+        );
+      })();
+    </script>
+    <title>AutoPaint CRM — Система обліку для автомаляра</title>
+    <meta name="description" content="Сучасна адаптивна CRM-система для автомаляра та кузовного цеху: замовлення, клієнти, авто, склад матеріалів та облік фінансів." />
+    <meta property="og:title" content="AutoPaint CRM — Система обліку для автомаляра" />
+    <meta property="og:description" content="Сучасна адаптивна CRM-система для автомаляра та кузовного цеху: замовлення, клієнти, авто, склад матеріалів та облік фінансів." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#0b0f17] text-slate-100 antialiased selection:bg-amber-500/30 selection:text-amber-200">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

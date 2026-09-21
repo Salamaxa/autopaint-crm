@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "Client": {
+      "title": "Client",
+      "description": "Auto repair shop customer record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique client ID" },
+        "name": { "type": "string", "description": "Customer full name" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "notes": { "type": "string", "description": "Additional customer notes" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "Customer vehicle profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique vehicle ID" },
+        "clientId": { "type": "string", "description": "Owner client ID" },
+        "make": { "type": "string", "description": "Vehicle make" },
+        "model": { "type": "string", "description": "Vehicle model" },
+        "licensePlate": { "type": "string", "description": "License plate number" },
+        "vin": { "type": "string", "description": "VIN code" },
+        "year": { "type": "number", "description": "Production year" },
+        "colorName": { "type": "string", "description": "Color name" },
+        "colorCode": { "type": "string", "description": "OEM paint color code" },
+        "notes": { "type": "string", "description": "Vehicle notes" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["id", "clientId", "make", "model", "licensePlate"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Work order / repair job",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique order ID" },
+        "orderNumber": { "type": "string", "description": "Human-readable order number" },
+        "clientId": { "type": "string", "description": "Client ID" },
+        "vehicleId": { "type": "string", "description": "Vehicle ID" },
+        "date": { "type": "string", "description": "Order creation date" },
+        "deadlineDate": { "type": "string", "description": "Target completion date" },
+        "status": { "type": "string", "description": "Current order status" },
+        "totalAmount": { "type": "number", "description": "Total order price" },
+        "paidAmount": { "type": "number", "description": "Total paid amount" },
+        "remainingAmount": { "type": "number", "description": "Remaining debt" },
+        "notes": { "type": "string", "description": "Order notes" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["id", "orderNumber", "clientId", "vehicleId", "status", "totalAmount"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "Paint, clearcoat, or workshop supply material",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique material ID" },
+        "name": { "type": "string", "description": "Material name" },
+        "category": { "type": "string", "description": "Inventory category" },
+        "unit": { "type": "string", "description": "Unit of measurement" },
+        "quantity": { "type": "number", "description": "Current quantity in stock" },
+        "minQuantity": { "type": "number", "description": "Minimum stock threshold" },
+        "price": { "type": "number", "description": "Purchase cost per unit" },
+        "supplier": { "type": "string", "description": "Supplier name" },
+        "notes": { "type": "string", "description": "Notes" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["id", "name", "category", "unit", "quantity", "price"]
+    },
+    "FinanceTransaction": {
+      "title": "FinanceTransaction",
+      "description": "Financial income or expense transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique transaction ID" },
+        "type": { "type": "string", "description": "income or expense" },
+        "category": { "type": "string", "description": "Transaction category" },
+        "amount": { "type": "number", "description": "Transaction amount in UAH" },
+        "date": { "type": "string", "description": "Transaction date" },
+        "orderId": { "type": "string", "description": "Related order ID" },
+        "clientId": { "type": "string", "description": "Related client ID" },
+        "description": { "type": "string", "description": "Description" },
+        "paymentMethod": { "type": "string", "description": "cash, card, or iban" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["id", "type", "category", "amount", "date", "paymentMethod"]
+    }
+  },
+  "firestore": {
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Auto repair workshop client records"
+    },
+    "/vehicles/{vehicleId}": {
+      "schema": "Vehicle",
+      "description": "Client vehicles with paint codes and details"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Work orders with sections, salaries, materials and payments"
+    },
+    "/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Paint shop materials and stock balances"
+    },
+    "/finances/{transactionId}": {
+      "schema": "FinanceTransaction",
+      "description": "Workshop payments and financial ledger"
+    }
+  }
+}
