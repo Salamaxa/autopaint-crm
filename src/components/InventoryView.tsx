@@ -46,6 +46,7 @@ interface ReceiptRecord {
   total: number;
   paidFromAccount: boolean;
   status: 'created' | 'draft';
+  items: Array<{ name: string; quantity: number; unit: string; price: number; total: number }>;
 }
 
 interface WriteoffRecord {
@@ -70,6 +71,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [activeSection, setActiveSection] = useState<'stock' | 'receipt' | 'writeoff' | 'inventory'>('stock');
   const [isReceiptFormOpen, setIsReceiptFormOpen] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptRecord | null>(null);
   const [isWriteoffFormOpen, setIsWriteoffFormOpen] = useState(false);
   const [receiptRecords, setReceiptRecords] = useState<ReceiptRecord[]>(() => {
     try {
@@ -293,6 +295,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       total: receiptTotal,
       paidFromAccount: receiptPayFromAccount,
       status,
+      items: receiptLines.map((line) => {
+        const item = inventory.find((entry) => entry.id === line.id);
+        const price = Number(line.price) || item?.price || 0;
+        const quantity = Number(line.quantity) || 0;
+        return { name: item?.name || 'Товар', quantity, unit: item?.unit || 'од.', price, total: quantity * price };
+      }),
     };
 
     if (status === 'created') {
@@ -467,7 +475,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   {receiptRecords.length === 0 ? (
                     <tr><td colSpan={10} className="px-6 py-16 text-center text-slate-500">Оприбуткувань ще немає. Створіть перший документ.</td></tr>
                   ) : receiptRecords.map((receipt) => (
-                    <tr key={receipt.id} className="transition-colors hover:bg-slate-900/60">
+                    <tr key={receipt.id} onClick={() => setSelectedReceipt(receipt)} className="cursor-pointer transition-colors hover:bg-slate-900/60">
                       <td className="px-4 py-3 font-semibold text-emerald-300">{receipt.number}</td>
                       <td className="px-4 py-3 text-slate-300">{new Date(receipt.createdAt).toLocaleDateString('uk-UA')}<span className="block text-xs text-slate-500">{new Date(receipt.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</span></td>
                       <td className="px-4 py-3 text-slate-400">{new Date(receipt.createdAt).toLocaleDateString('uk-UA')}</td>
@@ -484,6 +492,53 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {selectedReceipt && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={() => setSelectedReceipt(null)}>
+          <aside className="flex h-full w-full max-w-2xl flex-col overflow-hidden border-l border-slate-800 bg-[#111827] shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between border-b border-slate-800 bg-[#131b2c] px-5 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Оприбуткування {selectedReceipt.number}</h2>
+                <p className="mt-1 text-xs text-slate-400">Створено: {new Date(selectedReceipt.createdAt).toLocaleString('uk-UA')}</p>
+              </div>
+              <button type="button" onClick={() => setSelectedReceipt(null)} className="rounded-lg p-2 text-2xl leading-none text-slate-400 hover:bg-slate-800 hover:text-white" title="Закрити">×</button>
+            </div>
+
+            <div className="flex-1 space-y-5 overflow-y-auto p-5">
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Постачальник</p>
+                <p className="mt-2 font-semibold text-sky-300">{selectedReceipt.supplier}</p>
+                <p className="mt-1 text-sm text-slate-400">{selectedReceipt.supplierPhone || 'Телефон не вказано'}</p>
+                <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-800 pt-3 text-sm">
+                  <span className="text-slate-500">Менеджер</span><span className="text-right text-slate-200">{selectedReceipt.manager || '—'}</span>
+                  <span className="text-slate-500">Баланс</span><span className="text-right font-semibold text-rose-300">{selectedReceipt.paidFromAccount ? 'Оплачено' : `До сплати ${formatCurrency(selectedReceipt.total)}`}</span>
+                </div>
+              </div>
+
+              <div className="text-sm text-slate-300"><span className="text-slate-500">Склад:</span> {selectedReceipt.warehouse}</div>
+              <div>
+                <h3 className="mb-3 text-base font-bold text-white">Список товарів</h3>
+                <div className="overflow-hidden rounded-xl border border-slate-800">
+                  <div className="grid grid-cols-[minmax(0,1fr)_90px_80px_100px] bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><span>Найменування</span><span>Ціна</span><span>К-сть</span><span className="text-right">Сума</span></div>
+                  {(selectedReceipt.items || []).map((item, index) => <div key={`${item.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_90px_80px_100px] border-t border-slate-800 px-3 py-3 text-sm"><span className="pr-2 text-sky-300">{item.name}</span><span className="text-slate-300">{formatCurrency(item.price)}</span><span className="text-slate-300">{item.quantity} {item.unit}</span><span className="text-right font-semibold text-white">{formatCurrency(item.total)}</span></div>)}
+                  {(selectedReceipt.items || []).length === 0 && <div className="px-4 py-8 text-center text-sm text-slate-500">Позиції не збережені в цьому документі.</div>}
+                </div>
+                <div className="mt-3 flex justify-end border-t border-slate-800 pt-3 text-sm"><span className="text-slate-400">Разом:</span><strong className="ml-3 text-lg text-white">{formatCurrency(selectedReceipt.total)}</strong></div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Коментар</p>
+                <div className="min-h-20 rounded-xl border border-slate-800 bg-slate-900/50 p-3 text-sm text-slate-300">{selectedReceipt.comment || 'Коментар відсутній'}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-800 bg-[#0d131d] px-5 py-3">
+              <button type="button" onClick={() => setSelectedReceipt(null)} className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 hover:border-slate-500 hover:text-white">Закрити</button>
+              <button type="button" className="rounded-xl bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-600">Дії</button>
+            </div>
+          </aside>
         </div>
       )}
 
