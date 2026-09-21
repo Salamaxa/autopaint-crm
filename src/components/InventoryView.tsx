@@ -32,6 +32,18 @@ interface ReceiptLine {
   price: string;
 }
 
+interface ReceiptRecord {
+  id: string;
+  number: string;
+  createdAt: string;
+  date: string;
+  invoice: string;
+  supplier: string;
+  warehouse: string;
+  comment: string;
+  total: number;
+}
+
 export const InventoryView: React.FC<InventoryViewProps> = ({
   inventory,
   onSaveItem,
@@ -41,6 +53,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [activeSection, setActiveSection] = useState<'stock' | 'receipt' | 'writeoff' | 'inventory'>('stock');
+  const [isReceiptFormOpen, setIsReceiptFormOpen] = useState(false);
+  const [receiptRecords, setReceiptRecords] = useState<ReceiptRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('autopaint_crm_receipts');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [movementItemId, setMovementItemId] = useState('');
@@ -198,6 +219,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     event.preventDefault();
     if (!receiptSupplier.trim() || receiptLines.length === 0) return;
 
+    const record: ReceiptRecord = {
+      id: `receipt-${Date.now()}`,
+      number: String(100 + receiptRecords.length + 1),
+      createdAt: new Date().toISOString(),
+      date: receiptDate,
+      invoice: receiptInvoice,
+      supplier: receiptSupplier.trim(),
+      warehouse: receiptWarehouse,
+      comment: receiptComment.trim(),
+      total: receiptTotal,
+    };
+
     receiptLines.forEach((line) => {
       const item = inventory.find((entry) => entry.id === line.id);
       if (!item) return;
@@ -213,11 +246,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       });
     });
 
+    const nextRecords = [record, ...receiptRecords];
+    setReceiptRecords(nextRecords);
+    localStorage.setItem('autopaint_crm_receipts', JSON.stringify(nextRecords));
+
     setMovementMessage(`Оприбуткування ${receiptInvoice ? `№${receiptInvoice} ` : ''}проведено: ${receiptLines.length} позицій.`);
     setReceiptLines([]);
     setReceiptSupplier('');
     setReceiptInvoice('');
     setReceiptComment('');
+    setIsReceiptFormOpen(false);
   };
 
   const handleInventoryCount = (event: React.FormEvent) => {
@@ -298,6 +336,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             onClick={() => {
               setActiveSection(id as 'stock' | 'receipt' | 'writeoff' | 'inventory');
               setMovementMessage(null);
+              if (id !== 'receipt') setIsReceiptFormOpen(false);
             }}
             className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
               activeSection === id
@@ -315,7 +354,54 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         ))}
       </div>
 
-      {activeSection === 'receipt' && (
+      {activeSection === 'receipt' && !isReceiptFormOpen && (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm text-slate-400">Оприбутковуйте товари на склад, щоб вести їх облік, відстежувати залишки та історію рухів.</p>
+            </div>
+            <button type="button" onClick={() => { setMovementMessage(null); setIsReceiptFormOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/10 transition-colors hover:bg-emerald-400">
+              <Plus className="h-4 w-4" />
+              Оприбуткування
+            </button>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-[#111827] shadow-xl shadow-black/10">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[850px] text-left text-sm">
+                <thead className="bg-[#131b2c] text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Оприбуткування</th>
+                    <th className="px-4 py-3 font-semibold">Створено</th>
+                    <th className="px-4 py-3 font-semibold">Накладна</th>
+                    <th className="px-4 py-3 font-semibold">Постачальник</th>
+                    <th className="px-4 py-3 font-semibold">Склад</th>
+                    <th className="px-4 py-3 font-semibold">Коментар</th>
+                    <th className="px-4 py-3 text-right font-semibold">Сума, грн</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/80">
+                  {receiptRecords.length === 0 ? (
+                    <tr><td colSpan={7} className="px-6 py-16 text-center text-slate-500">Оприбуткувань ще немає. Створіть перший документ.</td></tr>
+                  ) : receiptRecords.map((receipt) => (
+                    <tr key={receipt.id} className="transition-colors hover:bg-slate-900/60">
+                      <td className="px-4 py-3 font-semibold text-emerald-300">{receipt.number}</td>
+                      <td className="px-4 py-3 text-slate-300">{new Date(receipt.createdAt).toLocaleDateString('uk-UA')}<span className="block text-xs text-slate-500">{new Date(receipt.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</span></td>
+                      <td className="px-4 py-3 text-slate-300">{receipt.invoice || '—'}</td>
+                      <td className="px-4 py-3 font-medium text-white">{receipt.supplier}</td>
+                      <td className="px-4 py-3 text-slate-300">{receipt.warehouse}</td>
+                      <td className="max-w-[220px] truncate px-4 py-3 text-slate-400">{receipt.comment || '—'}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-white">{formatCurrency(receipt.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSection === 'receipt' && isReceiptFormOpen && (
         <form onSubmit={handleReceiptSubmit} className="overflow-hidden rounded-2xl border border-slate-800 bg-[#111827] text-slate-200 shadow-2xl shadow-black/20">
           <div className="border-b border-slate-800 bg-[#131b2c] px-5 py-4">
             <div className="flex items-center gap-3">
