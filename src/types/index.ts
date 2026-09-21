@@ -120,6 +120,98 @@ export interface InventoryItem {
   updatedAt: string;
 }
 
+export type InventoryDocumentType =
+  | 'receipt'
+  | 'writeoff'
+  | 'return_to_stock'
+  | 'return_to_supplier'
+  | 'stocktake'
+  | 'adjustment';
+
+export type InventoryDocumentStatus = 'draft' | 'posted' | 'reversed';
+
+export interface InventoryDocumentLine {
+  id: string;
+  inventoryItemId: string;
+  batchId?: string;
+  name: string;
+  unit: string;
+  quantity: number;
+  unitCost: number;
+  total: number;
+  orderId?: string;
+  reason?: string;
+}
+
+export interface InventoryDocument {
+  id: string;
+  number: string;
+  type: InventoryDocumentType;
+  status: InventoryDocumentStatus;
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  updatedBy?: string;
+  supplier?: string;
+  supplierPhone?: string;
+  warehouseId: string;
+  warehouseName: string;
+  invoiceNumber?: string;
+  comment?: string;
+  orderId?: string;
+  paidFromAccount?: boolean;
+  accountingQuantity?: number;
+  actualQuantity?: number;
+  difference?: number;
+  lines: InventoryDocumentLine[];
+  total: number;
+  postedAt?: string;
+  postedBy?: string;
+  reversedAt?: string;
+  reversedBy?: string;
+  reversalDocumentId?: string;
+}
+
+export interface InventoryBatch {
+  id: string;
+  inventoryItemId: string;
+  warehouseId: string;
+  batchNumber?: string;
+  receivedDocumentId: string;
+  receivedAt: string;
+  expiresAt?: string;
+  unitCost: number;
+  initialQuantity: number;
+  remainingQuantity: number;
+  createdAt: string;
+}
+
+export type InventoryMovementType =
+  | 'receipt'
+  | 'writeoff'
+  | 'return_to_stock'
+  | 'return_to_supplier'
+  | 'stocktake_adjustment'
+  | 'reversal';
+
+export interface InventoryMovement {
+  id: string;
+  documentId: string;
+  documentNumber: string;
+  type: InventoryMovementType;
+  inventoryItemId: string;
+  batchId?: string;
+  warehouseId: string;
+  quantityDelta: number;
+  unitCost: number;
+  total: number;
+  orderId?: string;
+  reason?: string;
+  createdAt: string;
+  createdBy?: string;
+}
+
 export type TransactionType = 'income' | 'expense';
 
 export type PaymentMethod = 'cash' | 'card' | 'iban';

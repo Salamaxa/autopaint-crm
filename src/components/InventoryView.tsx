@@ -677,13 +677,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         <form onSubmit={handleMovement} className="rounded-xl border border-slate-800 bg-[#111827] p-4 sm:p-5 space-y-4">
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              {activeSection === 'receipt' ? <PackagePlus className="h-5 w-5 text-emerald-400" /> : <PackageMinus className="h-5 w-5 text-rose-400" />}
-              {activeSection === 'receipt' ? 'Оприбуткування товару' : 'Списання товару'}
+              <PackageMinus className="h-5 w-5 text-rose-400" />
+              Списання товару
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              {activeSection === 'receipt'
-                ? 'Додайте отриману кількість до залишку складу.'
-                : 'Зменшіть залишок через використання, брак або іншу причину.'}
+              Зменшіть залишок через використання, брак або іншу причину.
             </p>
           </div>
 
@@ -711,17 +709,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               placeholder="Кількість *"
               className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
             />
-            {activeSection === 'receipt' && (
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={movementPrice}
-                onChange={(event) => setMovementPrice(event.target.value)}
-                placeholder="Нова ціна закупівлі"
-                className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-              />
-            )}
             <input
               type="text"
               value={movementNote}
@@ -735,9 +722,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             {movementMessage && <p className="text-sm text-emerald-300">{movementMessage}</p>}
             <button
               type="submit"
-              className={`rounded-xl px-5 py-2.5 text-sm font-bold text-slate-950 transition-colors ${activeSection === 'receipt' ? 'bg-emerald-400 hover:bg-emerald-300' : 'bg-rose-400 hover:bg-rose-300'}`}
+              className="rounded-xl bg-rose-400 px-5 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-rose-300"
             >
-              {activeSection === 'receipt' ? 'Провести оприбуткування' : 'Провести списання'}
+              Провести списання
             </button>
           </div>
         </form>

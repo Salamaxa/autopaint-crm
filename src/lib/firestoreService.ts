@@ -8,7 +8,26 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { Client, Vehicle, Order, InventoryItem, FinanceTransaction } from '../types';
+import {
+  Client,
+  Vehicle,
+  Order,
+  InventoryItem,
+  FinanceTransaction,
+  InventoryDocument,
+  InventoryMovement,
+  InventoryBatch,
+} from '../types';
+
+type FirestoreCollection =
+  | 'clients'
+  | 'vehicles'
+  | 'orders'
+  | 'inventory'
+  | 'finances'
+  | 'inventoryDocuments'
+  | 'inventoryMovements'
+  | 'inventoryBatches';
 
 export enum OperationType {
   CREATE = 'create',
@@ -85,7 +104,7 @@ class FirestoreSyncService {
 
   // Generic real-time listener
   public subscribeToCollection<T extends { id: string }>(
-    colName: 'clients' | 'vehicles' | 'orders' | 'inventory' | 'finances',
+    colName: FirestoreCollection,
     onData: (items: T[]) => void
   ): () => void {
     try {
@@ -125,7 +144,7 @@ class FirestoreSyncService {
 
   // Save/Update single entity (Upsert)
   public async saveEntity<T extends { id: string }>(
-    colName: 'clients' | 'vehicles' | 'orders' | 'inventory' | 'finances',
+    colName: FirestoreCollection,
     item: T
   ): Promise<void> {
     try {
@@ -163,7 +182,7 @@ class FirestoreSyncService {
 
   // Check if a collection is empty
   public async isCollectionEmpty(
-    colName: 'clients' | 'vehicles' | 'orders' | 'inventory' | 'finances'
+    colName: FirestoreCollection
   ): Promise<boolean> {
     try {
       const snap = await getDocs(collection(db, colName));
@@ -175,7 +194,7 @@ class FirestoreSyncService {
 
   // Delete all documents in a collection in Firestore
   public async clearCollection(
-    colName: 'clients' | 'vehicles' | 'orders' | 'inventory' | 'finances'
+    colName: FirestoreCollection
   ): Promise<void> {
     try {
       const snap = await getDocs(collection(db, colName));
@@ -214,6 +233,9 @@ class FirestoreSyncService {
     orders: Order[];
     inventory: InventoryItem[];
     transactions: FinanceTransaction[];
+    inventoryDocuments?: InventoryDocument[];
+    inventoryMovements?: InventoryMovement[];
+    inventoryBatches?: InventoryBatch[];
   }): Promise<{ success: boolean; count: number }> {
     try {
       const batch = writeBatch(db);
@@ -237,6 +259,18 @@ class FirestoreSyncService {
       });
       data.transactions.forEach((t) => {
         batch.set(doc(db, 'finances', t.id), JSON.parse(JSON.stringify(t)), { merge: true });
+        count++;
+      });
+      data.inventoryDocuments?.forEach((document) => {
+        batch.set(doc(db, 'inventoryDocuments', document.id), JSON.parse(JSON.stringify(document)), { merge: true });
+        count++;
+      });
+      data.inventoryMovements?.forEach((movement) => {
+        batch.set(doc(db, 'inventoryMovements', movement.id), JSON.parse(JSON.stringify(movement)), { merge: true });
+        count++;
+      });
+      data.inventoryBatches?.forEach((batchRecord) => {
+        batch.set(doc(db, 'inventoryBatches', batchRecord.id), JSON.parse(JSON.stringify(batchRecord)), { merge: true });
         count++;
       });
 
