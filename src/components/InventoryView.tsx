@@ -39,9 +39,13 @@ interface ReceiptRecord {
   date: string;
   invoice: string;
   supplier: string;
+  supplierPhone: string;
+  manager: string;
   warehouse: string;
   comment: string;
   total: number;
+  paidFromAccount: boolean;
+  status: 'created' | 'draft';
 }
 
 interface WriteoffRecord {
@@ -91,10 +95,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [movementNote, setMovementNote] = useState('');
   const [movementMessage, setMovementMessage] = useState<string | null>(null);
   const [receiptSupplier, setReceiptSupplier] = useState('');
+  const [receiptSupplierPhone, setReceiptSupplierPhone] = useState('');
+  const [receiptManager, setReceiptManager] = useState('');
   const [receiptInvoice, setReceiptInvoice] = useState('');
   const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10));
   const [receiptWarehouse, setReceiptWarehouse] = useState('Основний склад');
   const [receiptComment, setReceiptComment] = useState('');
+  const [receiptPayFromAccount, setReceiptPayFromAccount] = useState(false);
   const [receiptLines, setReceiptLines] = useState<ReceiptLine[]>([]);
   const [receiptProductId, setReceiptProductId] = useState('');
   const [receiptProductQuantity, setReceiptProductQuantity] = useState('');
@@ -268,9 +275,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setReceiptProductPrice('');
   };
 
-  const handleReceiptSubmit = (event: React.FormEvent) => {
+  const handleReceiptSubmit = (event: React.FormEvent | React.MouseEvent, status: ReceiptRecord['status'] = 'created') => {
     event.preventDefault();
-    if (!receiptSupplier.trim() || receiptLines.length === 0) return;
+    if (!receiptSupplier.trim() || (status === 'created' && receiptLines.length === 0)) return;
 
     const record: ReceiptRecord = {
       id: `receipt-${Date.now()}`,
@@ -279,35 +286,46 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       date: receiptDate,
       invoice: receiptInvoice,
       supplier: receiptSupplier.trim(),
+      supplierPhone: receiptSupplierPhone.trim(),
+      manager: receiptManager.trim(),
       warehouse: receiptWarehouse,
       comment: receiptComment.trim(),
       total: receiptTotal,
+      paidFromAccount: receiptPayFromAccount,
+      status,
     };
 
-    receiptLines.forEach((line) => {
-      const item = inventory.find((entry) => entry.id === line.id);
-      if (!item) return;
-      const amount = Number(line.quantity) || 0;
-      const purchasePrice = Number(line.price) || item.price;
-      onSaveItem({
-        ...item,
-        quantity: Math.round((item.quantity + amount) * 100) / 100,
-        price: purchasePrice,
-        supplier: receiptSupplier.trim(),
-        notes: receiptComment.trim() || item.notes,
-        updatedAt: new Date().toISOString(),
+    if (status === 'created') {
+      receiptLines.forEach((line) => {
+        const item = inventory.find((entry) => entry.id === line.id);
+        if (!item) return;
+        const amount = Number(line.quantity) || 0;
+        const purchasePrice = Number(line.price) || item.price;
+        onSaveItem({
+          ...item,
+          quantity: Math.round((item.quantity + amount) * 100) / 100,
+          price: purchasePrice,
+          supplier: receiptSupplier.trim(),
+          notes: receiptComment.trim() || item.notes,
+          updatedAt: new Date().toISOString(),
+        });
       });
-    });
+    }
 
     const nextRecords = [record, ...receiptRecords];
     setReceiptRecords(nextRecords);
     localStorage.setItem('autopaint_crm_receipts', JSON.stringify(nextRecords));
 
-    setMovementMessage(`Оприбуткування ${receiptInvoice ? `№${receiptInvoice} ` : ''}проведено: ${receiptLines.length} позицій.`);
+    setMovementMessage(status === 'draft'
+      ? 'Документ збережено як чернетку.'
+      : `Оприбуткування ${receiptInvoice ? `№${receiptInvoice} ` : ''}проведено: ${receiptLines.length} позицій.`);
     setReceiptLines([]);
     setReceiptSupplier('');
+    setReceiptSupplierPhone('');
+    setReceiptManager('');
     setReceiptInvoice('');
     setReceiptComment('');
+    setReceiptPayFromAccount(false);
     setIsReceiptFormOpen(false);
   };
 
@@ -430,29 +448,35 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
           <div className="overflow-hidden rounded-2xl border border-slate-800 bg-[#111827] shadow-xl shadow-black/10">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[850px] text-left text-sm">
+              <table className="w-full min-w-[1080px] text-left text-sm">
                 <thead className="bg-[#131b2c] text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Оприбуткування</th>
                     <th className="px-4 py-3 font-semibold">Створено</th>
+                    <th className="px-4 py-3 font-semibold">Оновлено</th>
                     <th className="px-4 py-3 font-semibold">Накладна</th>
                     <th className="px-4 py-3 font-semibold">Постачальник</th>
+                    <th className="px-4 py-3 font-semibold">Менеджер</th>
                     <th className="px-4 py-3 font-semibold">Склад</th>
                     <th className="px-4 py-3 font-semibold">Коментар</th>
+                    <th className="px-4 py-3 font-semibold">Статус</th>
                     <th className="px-4 py-3 text-right font-semibold">Сума, грн</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
                   {receiptRecords.length === 0 ? (
-                    <tr><td colSpan={7} className="px-6 py-16 text-center text-slate-500">Оприбуткувань ще немає. Створіть перший документ.</td></tr>
+                    <tr><td colSpan={10} className="px-6 py-16 text-center text-slate-500">Оприбуткувань ще немає. Створіть перший документ.</td></tr>
                   ) : receiptRecords.map((receipt) => (
                     <tr key={receipt.id} className="transition-colors hover:bg-slate-900/60">
                       <td className="px-4 py-3 font-semibold text-emerald-300">{receipt.number}</td>
                       <td className="px-4 py-3 text-slate-300">{new Date(receipt.createdAt).toLocaleDateString('uk-UA')}<span className="block text-xs text-slate-500">{new Date(receipt.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</span></td>
+                      <td className="px-4 py-3 text-slate-400">{new Date(receipt.createdAt).toLocaleDateString('uk-UA')}</td>
                       <td className="px-4 py-3 text-slate-300">{receipt.invoice || '—'}</td>
-                      <td className="px-4 py-3 font-medium text-white">{receipt.supplier}</td>
+                      <td className="px-4 py-3 font-medium text-white">{receipt.supplier}<span className="block text-xs text-slate-500">{receipt.supplierPhone || '—'}</span></td>
+                      <td className="px-4 py-3 text-slate-300">{receipt.manager || '—'}</td>
                       <td className="px-4 py-3 text-slate-300">{receipt.warehouse}</td>
                       <td className="max-w-[220px] truncate px-4 py-3 text-slate-400">{receipt.comment || '—'}</td>
+                      <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${receipt.status === 'draft' ? 'bg-amber-500/10 text-amber-300' : 'bg-emerald-500/10 text-emerald-300'}`}>{receipt.status === 'draft' ? 'Чернетка' : 'Створено'}</span></td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-white">{formatCurrency(receipt.total)}</td>
                     </tr>
                   ))}
@@ -488,6 +512,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   placeholder="Введіть постачальника"
                   className="mt-1.5 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-normal text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
                 />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Телефон постачальника
+                <input value={receiptSupplierPhone} onChange={(event) => setReceiptSupplierPhone(event.target.value)} placeholder="+380 (__) ___ __ __" className="mt-1.5 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-normal text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Менеджер
+                <input value={receiptManager} onChange={(event) => setReceiptManager(event.target.value)} placeholder="Відповідальний менеджер" className="mt-1.5 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-normal text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" />
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Склад <span className="text-rose-500">*</span>
@@ -546,7 +578,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               {movementMessage && <span className="text-sm text-emerald-300">{movementMessage}</span>}
               <span className="text-sm text-slate-400">Разом: <strong className="ml-1 text-lg text-white">{formatCurrency(receiptTotal)}</strong></span>
             </div>
-            <button type="submit" disabled={!receiptSupplier.trim() || receiptLines.length === 0} className="ml-auto rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50">Створити</button>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-slate-400">
+                <input type="checkbox" checked={receiptPayFromAccount} onChange={(event) => setReceiptPayFromAccount(event.target.checked)} className="h-4 w-4 accent-emerald-500" />
+                Оплатити з рахунку
+              </label>
+              <button type="button" onClick={(event) => handleReceiptSubmit(event, 'draft')} disabled={!receiptSupplier.trim()} className="rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50">Зберегти як чернетку</button>
+              <button type="submit" disabled={!receiptSupplier.trim() || receiptLines.length === 0} className="rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50">Створити</button>
+            </div>
           </div>
         </form>
       )}
