@@ -82,6 +82,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     return inventory.filter((i) => i.quantity <= i.minQuantity).length;
   }, [inventory]);
 
+  const receiptTotal = useMemo(() => {
+    return receiptLines.reduce(
+      (sum, line) => sum + (Number(line.price) || 0) * (Number(line.quantity) || 0),
+      0,
+    );
+  }, [receiptLines]);
+
   // Filter items
   const filteredItems = useMemo(() => {
     return inventory.filter((item) => {
@@ -309,78 +316,89 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
 
       {activeSection === 'receipt' && (
-        <form onSubmit={handleReceiptSubmit} className="rounded-xl border border-slate-300 bg-white text-slate-700 shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-xl font-semibold text-slate-700">Нове оприбуткування</h2>
+        <form onSubmit={handleReceiptSubmit} className="overflow-hidden rounded-2xl border border-slate-800 bg-[#111827] text-slate-200 shadow-2xl shadow-black/20">
+          <div className="border-b border-slate-800 bg-[#131b2c] px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400">
+                <PackagePlus className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Нове оприбуткування</h2>
+                <p className="mt-0.5 text-xs text-slate-400">Документ надходження товарів на склад</p>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-5 p-5">
+          <div className="space-y-6 p-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <label className="text-sm font-semibold text-slate-600">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Постачальник <span className="text-rose-500">*</span>
                 <input
                   required
                   value={receiptSupplier}
                   onChange={(event) => setReceiptSupplier(event.target.value)}
                   placeholder="Введіть постачальника"
-                  className="mt-1.5 w-full rounded border border-slate-300 px-3 py-2.5 text-sm font-normal outline-none focus:border-emerald-500"
+                  className="mt-1.5 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-normal text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
                 />
               </label>
-              <label className="text-sm font-semibold text-slate-600">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Склад <span className="text-rose-500">*</span>
-                <select value={receiptWarehouse} onChange={(event) => setReceiptWarehouse(event.target.value)} className="mt-1.5 w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal outline-none focus:border-emerald-500">
+                <select value={receiptWarehouse} onChange={(event) => setReceiptWarehouse(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-normal text-white outline-none focus:border-emerald-500">
                   <option>Основний склад</option>
                   <option>Склад малярних матеріалів</option>
                 </select>
               </label>
-              <label className="text-sm font-semibold text-slate-600">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Номер накладної
-                <input value={receiptInvoice} onChange={(event) => setReceiptInvoice(event.target.value)} placeholder="№ накладної" className="mt-1.5 w-full rounded border border-slate-300 px-3 py-2.5 text-sm font-normal outline-none focus:border-emerald-500" />
+                <input value={receiptInvoice} onChange={(event) => setReceiptInvoice(event.target.value)} placeholder="№ накладної" className="mt-1.5 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-normal text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" />
               </label>
-              <label className="text-sm font-semibold text-slate-600">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Дата
-                <input type="date" value={receiptDate} onChange={(event) => setReceiptDate(event.target.value)} className="mt-1.5 w-full rounded border border-slate-300 px-3 py-2.5 text-sm font-normal outline-none focus:border-emerald-500" />
+                <input type="date" value={receiptDate} onChange={(event) => setReceiptDate(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-normal text-white outline-none focus:border-emerald-500" />
               </label>
             </div>
 
             <div>
-              <h3 className="mb-3 text-base font-bold text-slate-700">Список товарів</h3>
+              <h3 className="mb-3 text-base font-bold text-white">Список товарів</h3>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_140px_140px_auto]">
-                <select value={receiptProductId} onChange={(event) => setReceiptProductId(event.target.value)} className="rounded border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500">
+                <select value={receiptProductId} onChange={(event) => setReceiptProductId(event.target.value)} className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500">
                   <option value="">Оберіть товар зі складу</option>
                   {inventory.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
-                <input type="number" min="0.01" step="0.01" value={receiptProductPrice} onChange={(event) => setReceiptProductPrice(event.target.value)} placeholder="Ціна, грн" className="rounded border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
-                <input type="number" min="0.01" step="0.01" value={receiptProductQuantity} onChange={(event) => setReceiptProductQuantity(event.target.value)} placeholder="Кількість" className="rounded border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
+                <input type="number" min="0.01" step="0.01" value={receiptProductPrice} onChange={(event) => setReceiptProductPrice(event.target.value)} placeholder="Ціна, грн" className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" />
+                <input type="number" min="0.01" step="0.01" value={receiptProductQuantity} onChange={(event) => setReceiptProductQuantity(event.target.value)} placeholder="Кількість" className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" />
                 <button type="button" onClick={addReceiptLine} className="rounded bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">Додати</button>
               </div>
 
-              <div className="mt-3 overflow-hidden rounded border border-slate-200">
-                <div className="grid grid-cols-[minmax(0,1fr)_120px_110px_110px_42px] bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500">
+              <div className="mt-3 overflow-hidden rounded-xl border border-slate-800">
+                <div className="grid grid-cols-[minmax(0,1fr)_120px_110px_110px_42px] bg-slate-900 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-500">
                   <span>Найменування</span><span>Ціна, грн</span><span>Кількість</span><span>Сума, грн</span><span />
                 </div>
                 {receiptLines.length === 0 ? (
-                  <div className="px-4 py-10 text-center text-sm text-slate-500">Додайте товари в це оприбуткування.</div>
+                  <div className="bg-[#0d131d] px-4 py-10 text-center text-sm text-slate-500">Додайте товари в це оприбуткування.</div>
                 ) : receiptLines.map((line, index) => {
                   const item = inventory.find((entry) => entry.id === line.id);
                   const total = (Number(line.price) || 0) * (Number(line.quantity) || 0);
-                  return <div key={`${line.id}-${index}`} className="grid grid-cols-[minmax(0,1fr)_120px_110px_110px_42px] items-center border-t border-slate-200 px-3 py-2 text-sm">
-                    <span className="truncate pr-2">{item?.name || 'Товар'}</span><span>{formatCurrency(Number(line.price) || 0)}</span><span>{line.quantity} {item?.unit}</span><span>{formatCurrency(total)}</span>
-                    <button type="button" onClick={() => setReceiptLines((lines) => lines.filter((_, lineIndex) => lineIndex !== index))} className="text-rose-500 hover:text-rose-700" title="Видалити рядок">×</button>
+                  return <div key={`${line.id}-${index}`} className="grid grid-cols-[minmax(0,1fr)_120px_110px_110px_42px] items-center border-t border-slate-800 px-3 py-2.5 text-sm">
+                    <span className="truncate pr-2 font-medium text-slate-200">{item?.name || 'Товар'}</span><span className="text-slate-300">{formatCurrency(Number(line.price) || 0)}</span><span className="text-slate-300">{line.quantity} {item?.unit}</span><span className="font-semibold text-emerald-300">{formatCurrency(total)}</span>
+                    <button type="button" onClick={() => setReceiptLines((lines) => lines.filter((_, lineIndex) => lineIndex !== index))} className="text-xl leading-none text-slate-500 hover:text-rose-400" title="Видалити рядок">×</button>
                   </div>;
                 })}
               </div>
             </div>
 
-            <label className="block text-sm font-semibold text-slate-600">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
               Коментар
-              <textarea value={receiptComment} onChange={(event) => setReceiptComment(event.target.value)} rows={3} className="mt-1.5 w-full rounded border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:border-emerald-500" />
+              <textarea value={receiptComment} onChange={(event) => setReceiptComment(event.target.value)} rows={3} className="mt-1.5 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-normal text-white outline-none focus:border-emerald-500" />
             </label>
           </div>
 
-          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-3">
-            {movementMessage && <span className="text-sm text-emerald-600">{movementMessage}</span>}
-            <button type="submit" disabled={!receiptSupplier.trim() || receiptLines.length === 0} className="ml-auto rounded bg-emerald-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50">Створити</button>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 bg-[#0d131d] px-5 py-3">
+            <div className="flex items-center gap-5">
+              {movementMessage && <span className="text-sm text-emerald-300">{movementMessage}</span>}
+              <span className="text-sm text-slate-400">Разом: <strong className="ml-1 text-lg text-white">{formatCurrency(receiptTotal)}</strong></span>
+            </div>
+            <button type="submit" disabled={!receiptSupplier.trim() || receiptLines.length === 0} className="ml-auto rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50">Створити</button>
           </div>
         </form>
       )}
