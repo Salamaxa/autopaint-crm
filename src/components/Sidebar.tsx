@@ -12,14 +12,13 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { ActiveTab } from '../types';
-import { isSupabaseConfigured } from '../lib/supabase';
 
 interface SidebarProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   activeOrdersCount: number;
   lowStockCount: number;
-  openSupabaseModal: () => void;
+  openCloudDatabaseModal: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -27,10 +26,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   activeOrdersCount,
   lowStockCount,
-  openSupabaseModal,
+  openCloudDatabaseModal,
 }) => {
-  const isSupabaseLive = isSupabaseConfigured();
-
   const navItems = [
     {
       id: 'dashboard' as ActiveTab,
@@ -137,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Cloud Firestore status footer */}
       <div className="p-3 border-t border-slate-800/80">
         <button
-          onClick={openSupabaseModal}
+          onClick={openCloudDatabaseModal}
           className="w-full p-3 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition-all text-left group"
         >
           <div className="flex items-center justify-between mb-1.5">

@@ -9,6 +9,54 @@
 }
 
 /* Custom scrollbar for dark theme */
+.order-view-content {
+  color: #dbe4ef;
+  font-size: 15px;
+}
+
+.order-view-content table {
+  font-size: 14px;
+}
+
+.order-view-content th,
+.order-view-content td,
+.order-view-content .text-slate-400,
+.order-view-content .text-slate-500,
+.order-view-content .text-slate-300,
+.order-view-content .text-slate-200,
+.order-view-content .text-slate-100 {
+  color: #dbe4ef !important;
+}
+
+.order-view-content .text-white {
+  color: #ffffff !important;
+}
+
+.order-view-content th {
+  color: #94a3b8 !important;
+}
+
+.order-view-content th.text-amber-300,
+.order-view-content th.text-amber-400,
+.order-view-content td.text-amber-200,
+.order-view-content td.text-amber-300,
+.order-view-content td.text-amber-400 {
+  color: #f59e0b !important;
+}
+
+.order-view-content th.text-blue-300,
+.order-view-content th.text-blue-400,
+.order-view-content td.text-blue-200,
+.order-view-content td.text-blue-300,
+.order-view-content td.text-blue-400 {
+  color: #60a5fa !important;
+}
+
+.order-view-content .text-\[11px\],
+.order-view-content .text-\[10px\] {
+  font-size: 13px;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

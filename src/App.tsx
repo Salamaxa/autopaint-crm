@@ -23,7 +23,7 @@ export default function App() {
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
 
   // Modals & Navigation Helpers
-  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+  const [isCloudDatabaseModalOpen, setIsCloudDatabaseModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Quick Create triggers
@@ -106,7 +106,7 @@ export default function App() {
         }}
         activeOrdersCount={activeOrdersCount}
         lowStockCount={lowStockCount}
-        openSupabaseModal={() => setIsSupabaseModalOpen(true)}
+        openCloudDatabaseModal={() => setIsCloudDatabaseModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -114,12 +114,6 @@ export default function App() {
         {/* Desktop Header */}
         <Header
           activeTab={activeTab}
-          onOpenNewOrder={() => handleOpenNewOrder()}
-          onOpenNewClient={handleOpenNewClient}
-          onOpenNewVehicle={() => handleOpenNewVehicle()}
-          onOpenNewInventory={handleOpenNewInventory}
-          onOpenNewTransaction={handleOpenNewTransaction}
-          openSupabaseModal={() => setIsSupabaseModalOpen(true)}
           activeOrdersCount={activeOrdersCount}
           lowStockCount={lowStockCount}
         />
@@ -133,7 +127,7 @@ export default function App() {
           }}
           activeOrdersCount={activeOrdersCount}
           lowStockCount={lowStockCount}
-          openSupabaseModal={() => setIsSupabaseModalOpen(true)}
+          openCloudDatabaseModal={() => setIsCloudDatabaseModalOpen(true)}
         />
 
         {/* View Router */}
@@ -238,8 +232,8 @@ export default function App() {
 
       {/* Cloud Firestore database modal */}
       <CloudDatabaseModal
-        isOpen={isSupabaseModalOpen}
-        onClose={() => setIsSupabaseModalOpen(false)}
+        isOpen={isCloudDatabaseModalOpen}
+        onClose={() => setIsCloudDatabaseModalOpen(false)}
         onRefreshData={loadData}
         counts={{
           clients: clients.length,

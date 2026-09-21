@@ -8,17 +8,15 @@ import {
   Wallet,
   Paintbrush,
   Database,
-  Menu,
 } from 'lucide-react';
 import { ActiveTab } from '../types';
-import { isSupabaseConfigured } from '../lib/supabase';
 
 interface MobileNavProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   activeOrdersCount: number;
   lowStockCount: number;
-  openSupabaseModal: () => void;
+  openCloudDatabaseModal: () => void;
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({
@@ -26,10 +24,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   setActiveTab,
   activeOrdersCount,
   lowStockCount,
-  openSupabaseModal,
+  openCloudDatabaseModal,
 }) => {
-  const isSupabaseLive = isSupabaseConfigured();
-
   const navItems = [
     { id: 'dashboard' as ActiveTab, label: 'Головна', icon: LayoutDashboard },
     { id: 'orders' as ActiveTab, label: 'Замовлення', icon: ClipboardList, badge: activeOrdersCount },
@@ -54,7 +50,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         </div>
 
         <button
-          onClick={openSupabaseModal}
+          onClick={openCloudDatabaseModal}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-emerald-500/30 text-xs font-semibold text-slate-300"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
