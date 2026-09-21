@@ -44,6 +44,17 @@ interface ReceiptRecord {
   total: number;
 }
 
+interface WriteoffRecord {
+  id: string;
+  number: string;
+  createdAt: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  reason: string;
+  total: number;
+}
+
 export const InventoryView: React.FC<InventoryViewProps> = ({
   inventory,
   onSaveItem,
@@ -54,9 +65,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [activeSection, setActiveSection] = useState<'stock' | 'receipt' | 'writeoff' | 'inventory'>('stock');
   const [isReceiptFormOpen, setIsReceiptFormOpen] = useState(false);
+  const [isWriteoffFormOpen, setIsWriteoffFormOpen] = useState(false);
   const [receiptRecords, setReceiptRecords] = useState<ReceiptRecord[]>(() => {
     try {
       const saved = localStorage.getItem('autopaint_crm_receipts');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [writeoffRecords, setWriteoffRecords] = useState<WriteoffRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('autopaint_crm_writeoffs');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -85,12 +105,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   // Form State
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [category, setCategory] = useState<InventoryCategory>('clearcoats');
   const [unit, setUnit] = useState('шт');
   const [quantity, setQuantity] = useState<string>('1');
   const [minQuantity, setMinQuantity] = useState<string>('1');
   const [price, setPrice] = useState<string>('0');
   const [retailPrice, setRetailPrice] = useState<string>('0');
+  const [servicePrice, setServicePrice] = useState<string>('0');
+  const [warrantyMonths, setWarrantyMonths] = useState<string>('0');
+  const [expirationDate, setExpirationDate] = useState('');
   const [supplier, setSupplier] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -130,12 +154,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const openCreateModal = () => {
     setName('');
     setSku('');
+    setImageUrl('');
     setCategory('clearcoats');
     setUnit('л');
     setQuantity('1');
     setMinQuantity('2');
     setPrice('500');
     setRetailPrice('0');
+    setServicePrice('0');
+    setWarrantyMonths('0');
+    setExpirationDate('');
     setSupplier('');
     setNotes('');
     setIsCreateOpen(true);
@@ -145,12 +173,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setEditingItem(item);
     setName(item.name);
     setSku(item.sku || '');
+    setImageUrl(item.imageUrl || '');
     setCategory(item.category);
     setUnit(item.unit);
     setQuantity(String(item.quantity));
     setMinQuantity(String(item.minQuantity));
     setPrice(String(item.price));
     setRetailPrice(String(item.retailPrice ?? item.price));
+    setServicePrice(String(item.servicePrice ?? item.retailPrice ?? item.price));
+    setWarrantyMonths(String(item.warrantyMonths ?? 0));
+    setExpirationDate(item.expirationDate || '');
     setSupplier(item.supplier || '');
     setNotes(item.notes || '');
   };
@@ -188,6 +220,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       updatedAt: new Date().toISOString(),
       notes: movementNote.trim() || item.notes,
     });
+
+    if (activeSection === 'writeoff') {
+      const record: WriteoffRecord = {
+        id: `writeoff-${Date.now()}`,
+        number: String(100 + writeoffRecords.length + 1),
+        createdAt: new Date().toISOString(),
+        itemName: item.name,
+        quantity: amount,
+        unit: item.unit,
+        reason: movementNote.trim() || 'Списання матеріалу',
+        total: amount * item.price,
+      };
+      const nextRecords = [record, ...writeoffRecords];
+      setWriteoffRecords(nextRecords);
+      localStorage.setItem('autopaint_crm_writeoffs', JSON.stringify(nextRecords));
+      setIsWriteoffFormOpen(false);
+    }
 
     setMovementMessage(
       `${activeSection === 'receipt' ? 'Оприбутковано' : 'Списано'} ${amount} ${item.unit}: ${item.name}`
@@ -284,12 +333,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       id: editingItem ? editingItem.id : 'inv-' + Date.now(),
       name: name.trim(),
       sku: sku.trim() || undefined,
+      imageUrl: imageUrl.trim() || undefined,
       category,
       unit: unit.trim(),
       quantity: Number(quantity) || 0,
       minQuantity: Number(minQuantity) || 1,
       price: Number(price) || 0,
       retailPrice: Number(retailPrice) || 0,
+      servicePrice: Number(servicePrice) || 0,
+      warrantyMonths: Number(warrantyMonths) || 0,
+      expirationDate: expirationDate || undefined,
       supplier: supplier.trim() || undefined,
       notes: notes.trim() || undefined,
       updatedAt: new Date().toISOString(),
@@ -337,6 +390,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               setActiveSection(id as 'stock' | 'receipt' | 'writeoff' | 'inventory');
               setMovementMessage(null);
               if (id !== 'receipt') setIsReceiptFormOpen(false);
+              if (id !== 'writeoff') setIsWriteoffFormOpen(false);
             }}
             className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
               activeSection === id
@@ -489,7 +543,35 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </form>
       )}
 
-      {activeSection === 'writeoff' && (
+      {activeSection === 'writeoff' && !isWriteoffFormOpen && (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <p className="text-sm text-slate-400">Історія списань товарів зі складу.</p>
+            <button type="button" onClick={() => setIsWriteoffFormOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-500/10 transition-colors hover:bg-rose-400">
+              <Plus className="h-4 w-4" />
+              Списання
+            </button>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-[#111827] shadow-xl shadow-black/10">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="bg-[#131b2c] text-xs uppercase tracking-wide text-slate-500">
+                  <tr><th className="px-4 py-3">Списання</th><th className="px-4 py-3">Створено</th><th className="px-4 py-3">Товар</th><th className="px-4 py-3">Кількість</th><th className="px-4 py-3">Причина</th><th className="px-4 py-3 text-right">Сума, грн</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/80">
+                  {writeoffRecords.length === 0 ? <tr><td colSpan={6} className="px-6 py-16 text-center text-slate-500">Списань ще немає. Створіть перший документ.</td></tr> : writeoffRecords.map((record) => <tr key={record.id} className="hover:bg-slate-900/60">
+                    <td className="px-4 py-3 font-semibold text-rose-300">{record.number}</td>
+                    <td className="px-4 py-3 text-slate-300">{new Date(record.createdAt).toLocaleDateString('uk-UA')}<span className="block text-xs text-slate-500">{new Date(record.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</span></td>
+                    <td className="px-4 py-3 font-medium text-white">{record.itemName}</td><td className="px-4 py-3 text-slate-300">{record.quantity} {record.unit}</td><td className="px-4 py-3 text-slate-400">{record.reason}</td><td className="px-4 py-3 text-right font-mono text-white">{formatCurrency(record.total)}</td>
+                  </tr>)}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSection === 'writeoff' && isWriteoffFormOpen && (
         <form onSubmit={handleMovement} className="rounded-xl border border-slate-800 bg-[#111827] p-4 sm:p-5 space-y-4">
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -666,6 +748,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <th className="p-3.5 text-center">Мін. залишок</th>
                   <th className="p-3.5 text-right">Закупівля</th>
                   <th className="p-3.5 text-right">Роздріб</th>
+                  <th className="p-3.5 text-right">Сервіс</th>
+                  <th className="p-3.5 text-center">Гарантія</th>
+                  <th className="p-3.5 text-center">Придатний до</th>
                   <th className="p-3.5 text-right">Сума</th>
                   <th className="p-3.5 text-right">Дії</th>
                 </tr>
@@ -730,6 +815,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                       <td className="p-3.5 text-right font-mono text-blue-300">
                         {formatCurrency(item.retailPrice ?? item.price)}
+                      </td>
+
+                      <td className="p-3.5 text-right font-mono text-sky-300">
+                        {formatCurrency(item.servicePrice ?? item.retailPrice ?? item.price)}
+                      </td>
+
+                      <td className="p-3.5 text-center text-slate-300">
+                        {item.warrantyMonths ? `${item.warrantyMonths} міс.` : '—'}
+                      </td>
+
+                      <td className="p-3.5 text-center text-slate-300">
+                        {item.expirationDate || '—'}
                       </td>
 
                       {/* Total Value */}
@@ -806,6 +903,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               placeholder="напр. Лак акриловий Roberlo Kronox 610"
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              Посилання на зображення
+            </label>
+            <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -897,6 +1001,27 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 onChange={(e) => setRetailPrice(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm font-mono text-white focus:outline-none focus:border-amber-500"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Сервісна ціна (₴)
+              </label>
+              <input type="number" min="0" value={servicePrice} onChange={(e) => setServicePrice(e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-amber-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Гарантія (міс.)
+              </label>
+              <input type="number" min="0" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-amber-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Термін придатності
+              </label>
+              <input type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
             </div>
           </div>
 

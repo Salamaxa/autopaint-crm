@@ -105,12 +105,16 @@ export interface InventoryItem {
   id: string;
   name: string;
   sku?: string; // Артикул або код товару
+  imageUrl?: string; // Посилання на зображення товару
   category: InventoryCategory;
   unit: string; // л, мл, кг, г, шт, балон, рулон
   quantity: number;
   minQuantity: number; // Поріг попередження
   price: number; // Собівартість / ціна закупівлі
   retailPrice?: number; // Роздрібна ціна
+  servicePrice?: number; // Сервісна ціна
+  warrantyMonths?: number; // Гарантійний термін
+  expirationDate?: string; // Термін придатності
   supplier?: string;
   notes?: string;
   updatedAt: string;
