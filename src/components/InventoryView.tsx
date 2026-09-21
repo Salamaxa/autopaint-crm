@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { InventoryItem, InventoryCategory } from '../types';
 import { Modal } from './Modal';
+import { formatCurrency, INVENTORY_CATEGORIES } from '../lib/formatters';
 
 interface InventoryViewProps {
   onSaveItem: (item: InventoryItem) => void;
