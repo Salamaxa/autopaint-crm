@@ -62,6 +62,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available' | 'empty'>('all');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [activeSection, setActiveSection] = useState<'stock' | 'receipt' | 'writeoff' | 'inventory'>('stock');
   const [isReceiptFormOpen, setIsReceiptFormOpen] = useState(false);
@@ -146,10 +147,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
       const matchesCat = categoryFilter === 'all' || item.category === categoryFilter;
       const matchesLow = !showLowStockOnly || item.quantity <= item.minQuantity;
+      const matchesAvailability = availabilityFilter === 'all'
+        || (availabilityFilter === 'available' && item.quantity > 0)
+        || (availabilityFilter === 'empty' && item.quantity <= 0);
 
-      return matchesSearch && matchesCat && matchesLow;
+      return matchesSearch && matchesCat && matchesLow && matchesAvailability;
     });
-  }, [inventory, searchQuery, categoryFilter, showLowStockOnly]);
+  }, [inventory, searchQuery, categoryFilter, showLowStockOnly, availabilityFilter]);
 
   const openCreateModal = () => {
     setName('');
@@ -376,7 +380,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+      <div className="-mx-4 overflow-x-auto border-y border-slate-800 bg-[#0d131d] px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex min-w-max items-center gap-1">
         {[
           { id: 'stock', label: 'Залишки', icon: Boxes },
           { id: 'receipt', label: 'Оприбуткування', icon: PackagePlus },
@@ -392,20 +397,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               if (id !== 'receipt') setIsReceiptFormOpen(false);
               if (id !== 'writeoff') setIsWriteoffFormOpen(false);
             }}
-            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+            className={`inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${
               activeSection === id
                 ? id === 'writeoff'
-                  ? 'border-rose-500/60 bg-rose-500/10 text-rose-300'
+                  ? 'border-rose-400 text-rose-300'
                   : id === 'receipt'
-                    ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300'
-                    : 'border-amber-500/60 bg-amber-500/10 text-amber-300'
-                : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white'
+                    ? 'border-emerald-400 text-emerald-300'
+                    : id === 'inventory'
+                      ? 'border-sky-400 text-sky-300'
+                      : 'border-amber-400 text-amber-300'
+                : 'border-transparent text-slate-400 hover:border-slate-600 hover:text-white'
             }`}
           >
             <Icon className="h-4 w-4" />
             {label}
           </button>
         ))}
+        </div>
       </div>
 
       {activeSection === 'receipt' && !isReceiptFormOpen && (
@@ -704,7 +712,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <select
+          aria-label="Склад"
+          className="rounded-xl border border-slate-800 bg-[#111827] px-3.5 py-2.5 text-xs text-white focus:border-amber-500 focus:outline-none sm:w-56"
+        >
+          <option>Склад: Основний склад</option>
+          <option>Склад: Малярні матеріали</option>
+        </select>
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
@@ -728,6 +743,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </option>
           ))}
         </select>
+        <select
+          value={availabilityFilter}
+          onChange={(e) => setAvailabilityFilter(e.target.value as 'all' | 'available' | 'empty')}
+          aria-label="Доступність"
+          className="rounded-xl border border-slate-800 bg-[#111827] px-3.5 py-2.5 text-xs text-white focus:border-amber-500 focus:outline-none"
+        >
+          <option value="all">Доступність: Усі</option>
+          <option value="available">Доступність: Є в наявності</option>
+          <option value="empty">Доступність: Немає</option>
+        </select>
       </div>
 
       {/* Inventory Table / Responsive Cards */}
@@ -743,7 +768,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <table className="w-full text-xs text-left border-collapse">
               <thead className="bg-[#131b2e] text-slate-400 border-b border-slate-800 uppercase tracking-wider text-[11px] font-semibold">
                 <tr>
-                  <th className="p-3.5">Артикул / Найменування</th>
+                  <th className="p-3.5">Артикул</th>
+                  <th className="p-3.5">Зображення</th>
+                  <th className="p-3.5">Найменування</th>
                   <th className="p-3.5 text-center">Залишок</th>
                   <th className="p-3.5 text-center">Мін. залишок</th>
                   <th className="p-3.5 text-right">Закупівля</th>
@@ -763,8 +790,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   return (
                     <tr key={item.id} className="hover:bg-slate-900/50 transition-colors">
                       {/* Name and Category */}
+                      <td className="p-3.5 text-slate-300">{item.sku || '—'}</td>
+
                       <td className="p-3.5">
-                        <div className="text-[11px] text-slate-400 mb-1">{item.sku || 'Без артикулу'}</div>
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt="" className="h-10 w-10 rounded-lg border border-slate-700 object-cover" />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-600"><Package className="h-4 w-4" /></div>
+                        )}
+                      </td>
+
+                      <td className="p-3.5">
                         <div className="font-bold text-white text-sm">{item.name}</div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60">
