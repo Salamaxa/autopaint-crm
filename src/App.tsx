@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from './lib/firebase';
+import { LoginView } from './components/LoginView';
 import { ActiveTab, Client, Vehicle, Order, InventoryItem, FinanceTransaction, OrderStatus, PaymentMethod } from './types';
 import { storage } from './lib/storage';
 import { Sidebar } from './components/Sidebar';
@@ -13,6 +16,9 @@ import { FinancesView } from './components/FinancesView';
 import { CloudDatabaseModal } from './components/CloudDatabaseModal';
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   // Application Data States
@@ -46,13 +52,38 @@ export default function App() {
     setTransactions(storage.getTransactions());
   };
 
+    useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
   useEffect(() => {
+    if (!user) return;
+
     loadData();
+
     const unsubscribe = storage.subscribe(() => {
       loadData();
     });
+
     return () => unsubscribe();
-  }, []);
+  }, [user]);
+  
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#090d14] text-slate-100 flex items-center justify-center">
+        <div className="text-slate-400">Завантаження...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginView />;
+  }
 
   // Quick stats for badges
   const activeOrdersCount = orders.filter(
